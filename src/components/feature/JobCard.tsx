@@ -81,10 +81,6 @@ export default function JobCard({ job, onApply, onSave, isSaved, isApplied, show
   const handleApply = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user) {
-      navigate("/login");
-      return;
-    }
     if (applied) {
       setToast("You already applied to this job");
       return;
@@ -160,18 +156,16 @@ export default function JobCard({ job, onApply, onSave, isSaved, isApplied, show
               <i className={saved ? "ri-bookmark-fill" : "ri-bookmark-line"} />
             </button>
           )}
-          {user && (
-            <button
-              onClick={handleApply}
-              className={`rounded-lg px-4 py-2 text-center text-sm font-bold transition-colors ${
-                applied
-                  ? "border border-green-200 bg-green-50 text-green-600 cursor-default"
-                  : "bg-brand-orange text-white hover:bg-brand-orange-hover"
-              }`}
-            >
-              {applied ? "Applied" : "Apply"}
-            </button>
-          )}
+          <button
+            onClick={handleApply}
+            className={`rounded-lg px-4 py-2 text-center text-sm font-bold transition-colors ${
+              applied
+                ? "border border-green-200 bg-green-50 text-green-600 cursor-default"
+                : "bg-brand-orange text-white hover:bg-brand-orange-hover"
+            }`}
+          >
+            {applied ? "Applied" : "Apply"}
+          </button>
         </div>
       </div>
     </div>

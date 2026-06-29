@@ -122,10 +122,6 @@ export default function JobsList() {
   }, [allJobs, activeCategory, filters, sortBy]);
 
   const handleQuickApply = (jobId: string) => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
     setApplyJobId(jobId);
     setApplyOpen(true);
   };

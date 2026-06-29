@@ -22,13 +22,6 @@ export default function JobDetail() {
   const [jobLoading, setJobLoading] = useState(true);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!user) {
-      navigate("/login", { replace: true });
-    }
-  }, [user, navigate]);
-
   // Fetch job from local API
   useEffect(() => {
     if (!id) return;
@@ -75,7 +68,7 @@ export default function JobDetail() {
     checkStatus();
   }, [user, id]);
 
-  if (!user || jobLoading) {
+  if (jobLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-brand-bg">
         <div className="flex items-center gap-3">

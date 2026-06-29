@@ -35,11 +35,7 @@ const routes: RouteObject[] = [
   },
   {
     path: "/jobs",
-    element: (
-      <AuthGuard>
-        <JobsList />
-      </AuthGuard>
-    ),
+    element: <JobsList />,
   },
   {
     path: "/jobs/:id",

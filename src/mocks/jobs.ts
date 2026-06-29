@@ -1,6 +1,8 @@
+import { toJobSlug } from "@/lib/jobSlug";
+
 export interface Job {
   id: string;
-  slug: string; // SEO-friendly URL segment, e.g. "16-otr-dry-van-driver-at-werner-enterprises"
+  slug: string; // SEO-friendly URL segment e.g. "16-otr-dry-van-driver-at-werner-enterprises" — always present
   title: string;
   company: string;
   location: string;
@@ -327,6 +329,7 @@ function generateJobs(count: number): Job[] {
 
     result.push({
       id: String(i + 1),
+      slug: toJobSlug(i + 1, title, company),
       title,
       company,
       location,

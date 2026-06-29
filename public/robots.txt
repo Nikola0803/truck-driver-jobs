@@ -1,0 +1,19 @@
+User-agent: *
+# Public pages — allow everything except auth and admin
+Allow: /
+Allow: /jobs
+Allow: /jobs/
+Allow: /blog
+Allow: /blog/
+Allow: /for-fleets
+Allow: /match
+Allow: /privacy
+
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /api/
+
+Sitemap: https://truckdriverjobs.co/sitemap.xml

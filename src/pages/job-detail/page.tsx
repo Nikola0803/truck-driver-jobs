@@ -18,6 +18,7 @@ export default function JobDetail() {
   const [saved, setSaved] = useState(false);
   const [applied, setApplied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [externalUnlocked, setExternalUnlocked] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
   const [jobLoading, setJobLoading] = useState(true);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
@@ -125,6 +126,7 @@ export default function JobDetail() {
 
   const handleApplySuccess = () => {
     setApplied(true);
+    setExternalUnlocked(true);
     setApplyOpen(false);
   };
 
@@ -357,17 +359,35 @@ export default function JobDetail() {
                 </button>
               </div>
 
-              {/* For aggregated jobs — also show direct carrier link */}
+              {/* For aggregated jobs — direct carrier link (gated until Quick Apply submitted) */}
               {job.isAggregated && job.externalApplyUrl && (
-                <a
-                  href={job.externalApplyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-border py-2.5 text-xs font-semibold text-brand-text-secondary transition-colors hover:border-brand-orange hover:text-brand-orange"
-                >
-                  <i className="ri-external-link-line" />
-                  Also apply directly at {job.sourceCarrier ?? job.company}
-                </a>
+                externalUnlocked ? (
+                  <a
+                    href={job.externalApplyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 py-2.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100"
+                  >
+                    <i className="ri-external-link-line" />
+                    Also apply directly at {job.sourceCarrier ?? job.company}
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => setApplyOpen(true)}
+                    className="relative mt-2 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-brand-border py-2.5 text-xs font-semibold text-brand-text-secondary"
+                  >
+                    {/* Blurred background text */}
+                    <span className="absolute inset-0 flex items-center justify-center select-none blur-[3px] opacity-40 pointer-events-none">
+                      <i className="ri-external-link-line mr-1" />
+                      Also apply directly at {job.sourceCarrier ?? job.company}
+                    </span>
+                    {/* Lock overlay */}
+                    <span className="relative z-10 flex items-center gap-1.5 text-brand-orange">
+                      <i className="ri-lock-line" />
+                      Quick Apply to unlock direct link
+                    </span>
+                  </button>
+                )
               )}
 
               <p className="mt-3 text-center text-xs text-brand-text-muted">

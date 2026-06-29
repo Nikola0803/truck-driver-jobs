@@ -38,7 +38,6 @@ export default function Home() {
           .from("jobs")
           .select("*")
           .eq("status", "active")
-          .eq("featured", true)
           .order("created_at", { ascending: false })
           .limit(6),
         supabase
@@ -161,7 +160,7 @@ export default function Home() {
 
                 <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-brand-text-secondary md:text-lg lg:mx-0">
                   Browse high-paying CDL Class A positions. Company drivers, owner-operators, and teams welcome.
-                  Apply in 30 seconds after free signup.
+                  Apply in 30 seconds — no resume needed.
                 </p>
 
                 {/* Search / Lead Capture Widget */}
@@ -275,18 +274,16 @@ export default function Home() {
               </h2>
               <p className="mt-2 max-w-xl text-sm text-brand-text-secondary">
                 {totalJobCount} vetted trucking positions from top carriers across the United States.
-                Sign up to unlock full details and apply instantly.
+                No resume needed — apply in 30 seconds.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {!user && (
-                <Link
-                  to="/signup"
-                  className="rounded-lg border border-brand-orange px-4 py-2 text-sm font-semibold text-brand-orange transition-colors hover:bg-brand-orange hover:text-white whitespace-nowrap"
-                >
-                  Sign Up to View All
-                </Link>
-              )}
+              <Link
+                to="/jobs"
+                className="rounded-lg border border-brand-orange px-4 py-2 text-sm font-semibold text-brand-orange transition-colors hover:bg-brand-orange hover:text-white whitespace-nowrap"
+              >
+                View All Jobs
+              </Link>
             </div>
           </div>
 
@@ -325,37 +322,15 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Locked info teaser */}
-                <div className="mt-4 rounded-lg bg-brand-orange-light p-3">
-                  <div className="flex items-center gap-2">
-                    <i className="ri-lock-line text-brand-orange text-sm" />
-                    <span className="text-xs font-medium text-brand-orange">
-                      Full details locked
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-brand-text-secondary">
-                    Sign up to see company name, benefits, requirements, and apply in 30 seconds.
-                  </p>
-                </div>
-
                 {/* Footer CTA */}
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-xs text-brand-text-muted">{job.postedAt}</span>
-                  {user ? (
-                    <Link
-                      to={`/jobs/${job.id}`}
-                      className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
-                    >
-                      View Details
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/signup"
-                      className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
-                    >
-                      Sign Up to Apply
-                    </Link>
-                  )}
+                  <Link
+                    to={`/jobs/${job.id}`}
+                    className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
+                  >
+                    View Details
+                  </Link>
                 </div>
               </div>
             ))}
@@ -363,38 +338,13 @@ export default function Home() {
 
           {/* View all CTA */}
           <div className="mt-10 text-center">
-            {user ? (
-              <Link
-                to="/jobs"
-                className="inline-flex items-center gap-2 rounded-lg border border-brand-border px-6 py-3 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange"
-              >
-                View All Jobs
-                <i className="ri-arrow-right-line" />
-              </Link>
-            ) : (
-              <div className="rounded-2xl border border-brand-border bg-brand-bg p-6">
-                <p className="text-sm font-semibold text-brand-text">
-                  Want to see all {totalJobCount} positions?
-                </p>
-                <p className="mt-1 text-sm text-brand-text-secondary">
-                  Create a free profile to unlock the full job board and get matched with carriers.
-                </p>
-                <div className="mt-4 flex items-center justify-center gap-3">
-                  <Link
-                    to="/signup"
-                    className="rounded-lg bg-brand-orange px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
-                  >
-                    Create Free Profile
-                  </Link>
-                  <Link
-                    to="/login"
-                    className="rounded-lg border border-brand-border px-6 py-2.5 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange whitespace-nowrap"
-                  >
-                    Sign In
-                  </Link>
-                </div>
-              </div>
-            )}
+            <Link
+              to="/jobs"
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-border px-6 py-3 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange"
+            >
+              View All {totalJobCount} Jobs
+              <i className="ri-arrow-right-line" />
+            </Link>
           </div>
         </div>
       </section>

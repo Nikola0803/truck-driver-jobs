@@ -1129,12 +1129,20 @@ app.get("/sitemap.xml", (c) => {
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+  // SQLite stores dates as "YYYY-MM-DD HH:MM:SS" (space) or ISO "YYYY-MM-DDT..." (T).
+  // Split on either separator and validate to avoid Google Search Console "Invalid date" errors.
+  const toSitemapDate = (val: string | null | undefined): string => {
+    if (!val) return today;
+    const d = val.split("T")[0].split(" ")[0];
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today;
+  };
+
   const urlTag = (loc: string, lastmod: string, priority: string, changefreq: string) =>
     `  <url>\n    <loc>${esc(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 
   const staticUrls = staticPages.map((p) => urlTag(p.loc, today, p.priority, p.changefreq));
-  const jobUrls = jobs.map((j) => urlTag(`${DOMAIN}/jobs/${toJobSlug(j.id, j.title ?? "", j.company ?? "")}`, (j.updated_at ?? j.created_at ?? today).split("T")[0], "0.8", "weekly"));
-  const blogUrls = posts.map((p) => urlTag(`${DOMAIN}/blog/${p.slug}`, (p.updated_at ?? p.published_at ?? today).split("T")[0], "0.6", "monthly"));
+  const jobUrls = jobs.map((j) => urlTag(`${DOMAIN}/jobs/${toJobSlug(j.id, j.title ?? "", j.company ?? "")}`, toSitemapDate(j.updated_at ?? j.created_at), "0.8", "weekly"));
+  const blogUrls = posts.map((p) => urlTag(`${DOMAIN}/blog/${p.slug}`, toSitemapDate(p.updated_at ?? p.published_at), "0.6", "monthly"));
 
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',

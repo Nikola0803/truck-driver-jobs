@@ -5,6 +5,8 @@ import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import GoogleReviews from "@/components/feature/GoogleReviews";
 import SeoHead from "@/components/feature/SeoHead";
+import JobCard from "@/components/feature/JobCard";
+import ApplyModal from "@/components/feature/ApplyModal";
 import { supabase } from "@/lib/supabase";
 import SITE_URL from "@/lib/siteUrl";
 import { dbJobToJob } from "@/lib/jobMapper";
@@ -30,6 +32,11 @@ export default function Home() {
   const [blogLoading, setBlogLoading] = useState(true);
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([]);
   const [totalJobCount, setTotalJobCount] = useState(0);
+  const [applyJobId, setApplyJobId] = useState("");
+  const [applyJobTitle, setApplyJobTitle] = useState("");
+  const [applyJobCompany, setApplyJobCompany] = useState("");
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchJobs() {
@@ -290,49 +297,20 @@ export default function Home() {
           {/* Job Preview Grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {featuredJobs.map((job) => (
-              <div
+              <JobCard
                 key={job.id}
-                className="group flex flex-col rounded-xl border border-brand-border bg-brand-bg p-5 transition-all hover:-translate-y-0.5 hover:border-brand-orange/30"
-              >
-                {/* Header */}
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-orange-light">
-                    <i className="ri-truck-line text-lg text-brand-orange" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-brand-text md:text-base">
-                      {job.title}
-                    </h3>
-                    <p className="text-xs text-brand-text-secondary">
-                      {job.location}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-brand-surface px-3 py-1 text-xs font-medium text-brand-text-secondary border border-brand-border">
-                    {job.routeType}
-                  </span>
-                  <span className="rounded-full bg-brand-surface px-3 py-1 text-xs font-medium text-brand-text-secondary border border-brand-border">
-                    {job.equipment}
-                  </span>
-                  <span className="rounded-full bg-brand-surface px-3 py-1 text-xs font-medium text-brand-text-secondary border border-brand-border">
-                    {job.homeTime}
-                  </span>
-                </div>
-
-                {/* Footer CTA */}
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs text-brand-text-muted">{job.postedAt}</span>
-                  <Link
-                    to={`/jobs/${job.slug}`}
-                    className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
-                  >
-                    View Details
-                  </Link>
-                </div>
-              </div>
+                job={job}
+                isApplied={appliedJobIds.has(job.id)}
+                onApply={(jobId) => {
+                  const j = featuredJobs.find((x) => x.id === jobId);
+                  if (j) {
+                    setApplyJobId(jobId);
+                    setApplyJobTitle(j.title);
+                    setApplyJobCompany(j.company);
+                    setApplyOpen(true);
+                  }
+                }}
+              />
             ))}
           </div>
 
@@ -555,6 +533,18 @@ export default function Home() {
       </div>
 
       <Footer />
+
+      <ApplyModal
+        jobId={applyJobId}
+        jobTitle={applyJobTitle}
+        jobCompany={applyJobCompany}
+        isOpen={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        onSuccess={() => {
+          setAppliedJobIds((prev) => new Set([...prev, applyJobId]));
+          setApplyOpen(false);
+        }}
+      />
     </div>
   );
 }

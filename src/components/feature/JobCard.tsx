@@ -64,7 +64,11 @@ export default function JobCard({ job, onApply, onSave, isSaved, isApplied, show
     e.preventDefault();
     e.stopPropagation();
     if (applied) { setToast("Already applied"); return; }
-    onApply?.(job.id);
+    if (onApply) {
+      onApply(job.id);
+    } else {
+      navigate(`/jobs/${job.slug}`);
+    }
   };
 
   const descSnippet = job.description

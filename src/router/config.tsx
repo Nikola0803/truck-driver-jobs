@@ -27,6 +27,7 @@ import ScraperPage from "../pages/admin/scraper/page";
 import PrivacyPolicy from "../pages/privacy/page";
 import MatchPage from "../pages/match/page";
 import AdminLeads from "../pages/admin/leads/page";
+import CdlJobsPage from "../pages/cdl-jobs/page";
 
 const routes: RouteObject[] = [
   {
@@ -102,6 +103,10 @@ const routes: RouteObject[] = [
   {
     path: "/match",
     element: <MatchPage />,
+  },
+  {
+    path: "/cdl-jobs/:slug",
+    element: <CdlJobsPage />,
   },
   {
     path: "*",

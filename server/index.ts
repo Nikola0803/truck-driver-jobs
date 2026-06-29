@@ -1092,6 +1092,31 @@ app.get("/sitemap.xml", (c) => {
     { loc: `${DOMAIN}/match`, priority: "0.8", changefreq: "monthly" },
     { loc: `${DOMAIN}/blog`, priority: "0.7", changefreq: "weekly" },
     { loc: `${DOMAIN}/privacy`, priority: "0.3", changefreq: "yearly" },
+    // Programmatic SEO — equipment pages
+    { loc: `${DOMAIN}/cdl-jobs/dry-van`,  priority: "0.85", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/flatbed`,  priority: "0.85", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/reefer`,   priority: "0.85", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/tanker`,   priority: "0.85", changefreq: "daily" },
+    // Programmatic SEO — state pages
+    { loc: `${DOMAIN}/cdl-jobs/texas`,          priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/florida`,         priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/georgia`,         priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/illinois`,        priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/pennsylvania`,    priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/ohio`,            priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/mississippi`,     priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/indiana`,         priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/north-carolina`,  priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/alabama`,         priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/virginia`,        priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/california`,      priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/tennessee`,       priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/south-carolina`,  priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/new-jersey`,      priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/wisconsin`,       priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/new-york`,        priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/maryland`,        priority: "0.8", changefreq: "daily" },
+    { loc: `${DOMAIN}/cdl-jobs/louisiana`,       priority: "0.8", changefreq: "daily" },
   ];
 
   const jobs = db.prepare(
@@ -1291,7 +1316,159 @@ registerScheduledTask({
 // ── Static file serving (production only — Vite handles this in dev) ────────
 // Serves the built React app from out/ and falls back to index.html for SPA routing
 const STATIC_DIR = resolve(process.cwd(), "out");
+
+// ── Server-side SEO injection ─────────────────────────────────────────────
+// Intercepts job detail pages and injects correct title/meta/JSON-LD into
+// the initial HTML so Googlebot sees full SEO data without executing JS.
+function injectSeoIntoHtml(html: string, patches: {
+  title: string;
+  description: string;
+  canonical: string;
+  jsonLd: Record<string, unknown>[];
+}): string {
+  const esc = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const desc = esc(patches.description.slice(0, 160));
+  const title = esc(patches.title);
+  const canonical = patches.canonical;
+  const ldScript = patches.jsonLd
+    .map((ld) => `<script type="application/ld+json">${JSON.stringify(ld)}</script>`)
+    .join("\n");
+
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*(")/,  `$1${desc}$2`)
+    .replace(/(<link rel="canonical" href=")[^"]*(")/,        `$1${canonical}$2`)
+    .replace(/(<meta property="og:title" content=")[^"]*(")/,       `$1${title}$2`)
+    .replace(/(<meta property="og:description" content=")[^"]*(")/,  `$1${desc}$2`)
+    .replace(/(<meta property="og:url" content=")[^"]*(")/,          `$1${canonical}$2`)
+    .replace(/(<meta name="twitter:title" content=")[^"]*(")/,       `$1${title}$2`)
+    .replace(/(<meta name="twitter:description" content=")[^"]*(")/,  `$1${desc}$2`)
+    .replace("</head>", `${ldScript}\n</head>`);
+}
+
+// ── Slug maps (mirrors src/lib/seoSlugs.ts) ──────────────────────────────
+const STATE_SLUGS: Record<string, { abbr: string; name: string }> = {
+  "texas":          { abbr: "TX", name: "Texas" },
+  "florida":        { abbr: "FL", name: "Florida" },
+  "georgia":        { abbr: "GA", name: "Georgia" },
+  "illinois":       { abbr: "IL", name: "Illinois" },
+  "pennsylvania":   { abbr: "PA", name: "Pennsylvania" },
+  "ohio":           { abbr: "OH", name: "Ohio" },
+  "mississippi":    { abbr: "MS", name: "Mississippi" },
+  "indiana":        { abbr: "IN", name: "Indiana" },
+  "north-carolina": { abbr: "NC", name: "North Carolina" },
+  "alabama":        { abbr: "AL", name: "Alabama" },
+  "virginia":       { abbr: "VA", name: "Virginia" },
+  "california":     { abbr: "CA", name: "California" },
+  "tennessee":      { abbr: "TN", name: "Tennessee" },
+  "south-carolina": { abbr: "SC", name: "South Carolina" },
+  "new-jersey":     { abbr: "NJ", name: "New Jersey" },
+  "wisconsin":      { abbr: "WI", name: "Wisconsin" },
+  "new-york":       { abbr: "NY", name: "New York" },
+  "maryland":       { abbr: "MD", name: "Maryland" },
+  "louisiana":      { abbr: "LA", name: "Louisiana" },
+};
+const EQUIPMENT_SLUGS: Record<string, string> = {
+  "dry-van": "Dry Van", "flatbed": "Flatbed", "reefer": "Reefer", "tanker": "Tanker",
+};
+
 if (existsSync(STATIC_DIR)) {
+  // Job detail pages — inject SEO before serving SPA shell
+  app.get("/jobs/:id", (c) => {
+    const id = Number(c.req.param("id"));
+    let html: string;
+    try {
+      html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8");
+    } catch {
+      return c.text("App not built. Run: npm run build", 503);
+    }
+
+    const job = isNaN(id) ? null : db.prepare(
+      "SELECT id, title, company, location, route_type, equipment, home_time, description, created_at FROM jobs WHERE id = ? AND status = 'active'"
+    ).get(id) as any;
+
+    if (!job) return c.html(html); // unknown job — serve SPA as-is
+
+    const DOMAIN = "https://truckdriverjobs.co";
+    const canonical = `${DOMAIN}/jobs/${job.id}`;
+    const titleText = `${job.title} at ${job.company} | CDL Trucking Job`;
+    const descText = [
+      `${job.title} at ${job.company} in ${job.location}.`,
+      job.route_type ? `${job.route_type} route.` : "",
+      job.equipment ? `${job.equipment} equipment.` : "",
+      job.home_time ? `${job.home_time} home time.` : "",
+      "Apply in 30 seconds — no resume needed.",
+    ].filter(Boolean).join(" ");
+
+    const jsonLd: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": job.title,
+        "datePosted": (job.created_at ?? new Date().toISOString()).split("T")[0],
+        "description": job.description ?? descText,
+        "employmentType": "FULL_TIME",
+        "hiringOrganization": { "@type": "Organization", "name": job.company },
+        "jobLocation": {
+          "@type": "Place",
+          "address": { "@type": "PostalAddress", "addressLocality": job.location, "addressCountry": "US" }
+        },
+        "url": canonical,
+        "directApply": true,
+      },
+    ];
+
+    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
+  });
+
+  // Programmatic SEO pages — /cdl-jobs/:slug
+  app.get("/cdl-jobs/:slug", (c) => {
+    const slug = c.req.param("slug");
+    let html: string;
+    try {
+      html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8");
+    } catch {
+      return c.text("App not built. Run: npm run build", 503);
+    }
+
+    const DOMAIN = "https://truckdriverjobs.co";
+    const canonical = `${DOMAIN}/cdl-jobs/${slug}`;
+
+    const stateInfo = STATE_SLUGS[slug];
+    const equipmentLabel = EQUIPMENT_SLUGS[slug];
+
+    if (!stateInfo && !equipmentLabel) return c.html(html);
+
+    let titleText: string, descText: string, count = 0;
+
+    if (stateInfo) {
+      const row = db.prepare(
+        "SELECT COUNT(*) as c FROM jobs WHERE status='active' AND (state = ? OR state = ?)"
+      ).get(stateInfo.abbr, stateInfo.name) as any;
+      count = row?.c ?? 0;
+      titleText = `CDL Truck Driving Jobs in ${stateInfo.name}`;
+      descText = `Find ${count} CDL truck driving jobs in ${stateInfo.name} from verified carriers. Dry Van, Flatbed, Reefer and Tanker positions available. Apply in 30 seconds — no resume needed.`;
+    } else {
+      const row = db.prepare(
+        "SELECT COUNT(*) as c FROM jobs WHERE status='active' AND equipment = ?"
+      ).get(equipmentLabel) as any;
+      count = row?.c ?? 0;
+      titleText = `${equipmentLabel} Truck Driving Jobs`;
+      descText = `Find ${count} ${equipmentLabel} CDL truck driving jobs across the US from verified carriers. OTR, Regional, and Local routes available. Apply in 30 seconds — no resume needed.`;
+    }
+
+    const jsonLd: Record<string, unknown>[] = [{
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": titleText,
+      "description": descText,
+      "url": canonical,
+      "numberOfItems": count,
+    }];
+
+    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
+  });
+
   app.use("/*", serveStatic({ root: "./out" }));
   app.notFound((c) => {
     // SPA fallback — let React Router handle the route

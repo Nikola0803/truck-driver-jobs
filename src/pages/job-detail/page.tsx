@@ -364,7 +364,7 @@ export default function JobDetail() {
 
               {/* For aggregated jobs — direct carrier link (gated until Quick Apply submitted) */}
               {job.isAggregated && job.externalApplyUrl && (
-                externalUnlocked ? (
+                (externalUnlocked || !!user) ? (
                   <a
                     href={job.externalApplyUrl}
                     target="_blank"

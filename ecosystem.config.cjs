@@ -15,6 +15,7 @@ module.exports = {
 
       // Reliability
       instances: 1,
+      exec_mode: "fork",
       autorestart: true,
       watch: false,
       max_memory_restart: "512M",
@@ -23,6 +24,7 @@ module.exports = {
       error_file: "/var/log/pm2/tdj-error.log",
       out_file: "/var/log/pm2/tdj-out.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss",
+      merge_logs: true,
     },
   ],
 };

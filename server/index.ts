@@ -269,6 +269,9 @@ function nestJoinCols(row: Record<string, any>, joinAliases: string[]): Record<s
   return out;
 }
 
+// Health check — must be before generic /api/:table handlers
+app.get("/api/health", (c) => c.json({ ok: true, db: "sqlite", version: "1.0.0" }));
+
 /** POST /api/quick-apply — Quick Apply from job detail page, saves application + notifies admin */
 app.post("/api/quick-apply", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -1076,11 +1079,6 @@ app.patch("/api/admin/leads/:id/status", async (c) => {
   return c.json({ ok: true });
 });
 
-// ── Health check ─────────────────────────────────────────────────────────
-app.get("/api/health", (c) => c.json({ ok: true, db: "sqlite", version: "1.0.0" }));
-
-// Root — redirect browsers that accidentally hit port 3001
-app.get("/", (c) => c.redirect("http://localhost:3000", 302));
 
 // ── Dynamic Sitemap ──────────────────────────────────────────────────────
 app.get("/sitemap.xml", (c) => {

@@ -338,12 +338,78 @@ export default function ScraperPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* JSearch — first because it aggregates the most sources */}
+          <div className="rounded-lg border-2 border-brand-orange/40 bg-brand-bg p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground-950">JSearch (RapidAPI)</p>
+                <p className="text-xs text-foreground-500">Indeed + LinkedIn + ZipRecruiter + Glassdoor</p>
+              </div>
+              <span className="rounded-full bg-brand-orange-light px-2.5 py-0.5 text-[10px] font-bold text-brand-orange">BEST</span>
+            </div>
+            {jsearchResult && (
+              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                <i className="ri-check-line mr-1" />
+                Imported {jsearchResult.total} jobs — {jsearchResult.inserted} new, {jsearchResult.updated} updated
+              </div>
+            )}
+            {jsearchError && (
+              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+                {jsearchError}
+              </div>
+            )}
+            <button
+              onClick={runJSearch}
+              disabled={jsearchRunning}
+              className="w-full rounded-lg bg-brand-orange py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-brand-orange-hover disabled:opacity-50"
+            >
+              {jsearchRunning ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin" /> Fetching CDL jobs...
+                </span>
+              ) : "Fetch + Import Jobs"}
+            </button>
+          </div>
+
+          {/* Indeed RSS */}
+          <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground-950">Indeed RSS</p>
+                <p className="text-xs text-foreground-500">Free · no key · 12 CDL queries</p>
+              </div>
+              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">FREE</span>
+            </div>
+            {indeedResult && (
+              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                <i className="ri-check-line mr-1" />
+                Imported {indeedResult.total} jobs — {indeedResult.inserted} new, {indeedResult.updated} updated
+              </div>
+            )}
+            {indeedError && (
+              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+                {indeedError}
+              </div>
+            )}
+            <button
+              onClick={runIndeed}
+              disabled={indeedRunning}
+              className="w-full rounded-lg bg-primary-500 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
+            >
+              {indeedRunning ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin" /> Fetching CDL jobs...
+                </span>
+              ) : "Fetch + Import Jobs"}
+            </button>
+          </div>
+
           {/* Adzuna */}
           <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-foreground-950">Adzuna</p>
-                <p className="text-xs text-foreground-500">CDL jobs across the US · trial access</p>
+                <p className="text-xs text-foreground-500">CDL jobs across the US</p>
               </div>
               <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">LIVE</span>
             </div>
@@ -399,72 +465,6 @@ export default function ScraperPage() {
               {jobicyRunning ? (
                 <span className="flex items-center justify-center gap-2">
                   <i className="ri-loader-4-line animate-spin" /> Fetching jobs...
-                </span>
-              ) : "Fetch + Import Jobs"}
-            </button>
-          </div>
-
-          {/* Indeed RSS */}
-          <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground-950">Indeed RSS</p>
-                <p className="text-xs text-foreground-500">Free · no key · 12 CDL queries</p>
-              </div>
-              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">FREE</span>
-            </div>
-            {indeedResult && (
-              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
-                <i className="ri-check-line mr-1" />
-                Imported {indeedResult.total} jobs — {indeedResult.inserted} new, {indeedResult.updated} updated
-              </div>
-            )}
-            {indeedError && (
-              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
-                {indeedError}
-              </div>
-            )}
-            <button
-              onClick={runIndeed}
-              disabled={indeedRunning}
-              className="w-full rounded-lg bg-primary-500 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
-            >
-              {indeedRunning ? (
-                <span className="flex items-center justify-center gap-2">
-                  <i className="ri-loader-4-line animate-spin" /> Fetching CDL jobs...
-                </span>
-              ) : "Fetch + Import Jobs"}
-            </button>
-          </div>
-
-          {/* JSearch */}
-          <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground-950">JSearch (RapidAPI)</p>
-                <p className="text-xs text-foreground-500">Indeed + LinkedIn + ZipRecruiter + Glassdoor</p>
-              </div>
-              <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-[10px] font-bold text-yellow-700">NEEDS KEY</span>
-            </div>
-            {jsearchResult && (
-              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
-                <i className="ri-check-line mr-1" />
-                Imported {jsearchResult.total} jobs — {jsearchResult.inserted} new, {jsearchResult.updated} updated
-              </div>
-            )}
-            {jsearchError && (
-              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
-                {jsearchError}
-              </div>
-            )}
-            <button
-              onClick={runJSearch}
-              disabled={jsearchRunning}
-              className="w-full rounded-lg bg-primary-500 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
-            >
-              {jsearchRunning ? (
-                <span className="flex items-center justify-center gap-2">
-                  <i className="ri-loader-4-line animate-spin" /> Fetching CDL jobs...
                 </span>
               ) : "Fetch + Import Jobs"}
             </button>

@@ -98,18 +98,25 @@ ufw --force enable
 success "Firewall configured (SSH + HTTP/HTTPS open)"
 
 # ── 7. Clone repo ────────────────────────────────────────────────────────────
-info "Cloning repo to $APP_DIR..."
-mkdir -p /var/www
+info "Setting up app directory at $APP_DIR..."
+mkdir -p "$APP_DIR"
 
 if [ -d "$APP_DIR/.git" ]; then
-  warn "Repo already exists at $APP_DIR — pulling latest instead"
+  warn "Repo already exists — pulling latest..."
   cd "$APP_DIR"
-  git pull origin main
-else
+  git pull origin main || warn "Pull failed — continuing with existing files"
+elif git ls-remote "$GITHUB_REPO" &>/dev/null 2>&1; then
   git clone "$GITHUB_REPO" "$APP_DIR"
   cd "$APP_DIR"
+  success "Repo cloned from GitHub"
+else
+  warn "GitHub repo not accessible yet — you'll push code after this script."
+  warn "Files will be deployed automatically on your first git push."
+  cd "$APP_DIR"
+  # Init empty git repo so PM2 config exists
+  git init
+  git remote add origin "$GITHUB_REPO" 2>/dev/null || true
 fi
-success "Repo cloned"
 
 # ── 8. .env file ─────────────────────────────────────────────────────────────
 if [ ! -f "$APP_DIR/.env" ]; then
@@ -136,22 +143,25 @@ ENVEOF
   echo ""
 fi
 
-# ── 9. Install deps + build ──────────────────────────────────────────────────
-info "Installing npm dependencies..."
+# ── 9. Install deps + build (only if package.json exists) ───────────────────
 cd "$APP_DIR"
-npm ci
-success "Dependencies installed"
+if [ -f "package.json" ]; then
+  info "Installing npm dependencies..."
+  npm ci
+  success "Dependencies installed"
 
-info "Building frontend..."
-npm run build
-success "Frontend built"
+  info "Building frontend..."
+  npm run build
+  success "Frontend built"
 
-# ── 10. Start with PM2 ───────────────────────────────────────────────────────
-info "Starting app with PM2..."
-cd "$APP_DIR"
-pm2 delete truck-driver-jobs 2>/dev/null || true
-pm2 start ecosystem.config.cjs
-pm2 save
+  # ── 10. Start with PM2 ───────────────────────────────────────────────────
+  info "Starting app with PM2..."
+  pm2 delete truck-driver-jobs 2>/dev/null || true
+  pm2 start ecosystem.config.cjs
+  pm2 save
+else
+  warn "No package.json yet — app will start automatically on first git push deploy."
+fi
 
 # Enable PM2 on reboot
 env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root

@@ -7,43 +7,31 @@ echo  ============================================
 echo    TruckDriverJobs.co ^> VPS Setup
 echo  ============================================
 echo.
-echo  STEP 1 of 3 — make sure you've already:
-echo    [x] Created the repo on github.com/new
-echo    [x] Run push-to-github.bat successfully
+echo  This will SSH into 72.62.97.74 and run
+echo  the full setup automatically.
 echo.
-echo  STEP 2 of 3 — enter your VPS IP below
+echo  When asked for password — type it and hit Enter.
+echo  Then wait ~5 minutes for everything to install.
 echo.
-set /p VPS_IP="  VPS IP address: "
+pause
 
 echo.
-echo  ============================================
-echo  STEP 3 of 3 — copy the command below,
-echo  then SSH into your VPS and paste it.
-echo  ============================================
-echo.
-echo  SSH command to connect to your VPS:
-echo.
-echo    ssh root@%VPS_IP%
-echo.
-echo  Once connected, paste this ONE command:
-echo.
-echo    bash ^<^(curl -fsSL https://raw.githubusercontent.com/Nikola0803/truck-driver-jobs/main/scripts/setup-vps.sh^)
-echo.
-echo  It will install everything and at the end
-echo  print 3 secrets to add to GitHub.
-echo.
-echo  ============================================
-echo  Opening SSH connection now...
-echo  ============================================
+echo  Connecting and running setup...
 echo.
 
-:: Copy the setup command to clipboard so they can paste it
-echo bash ^<^(curl -fsSL https://raw.githubusercontent.com/Nikola0803/truck-driver-jobs/main/scripts/setup-vps.sh^) | clip
-echo  [Clipboard] Setup command copied to clipboard - just paste it after connecting!
+ssh -o StrictHostKeyChecking=no root@72.62.97.74 "bash -s" < scripts\setup-vps.sh
+
 echo.
-
-:: Try to open SSH (works if OpenSSH is installed, which it is on Windows 10/11)
-start cmd /k "ssh root@%VPS_IP%"
-
+if %errorlevel% == 0 (
+    echo  ============================================
+    echo    SUCCESS - VPS is set up!
+    echo    Check the output above for the 3 GitHub
+    echo    secrets you need to add.
+    echo  ============================================
+) else (
+    echo  ============================================
+    echo    Something went wrong - check output above
+    echo  ============================================
+)
 echo.
 pause

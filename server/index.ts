@@ -1133,8 +1133,17 @@ app.get("/sitemap.xml", (c) => {
   // Split on either separator and validate to avoid Google Search Console "Invalid date" errors.
   const toSitemapDate = (val: string | null | undefined): string => {
     if (!val) return today;
-    const d = val.split("T")[0].split(" ")[0];
-    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today;
+    const trimmed = val.trim();
+    if (!trimmed) return today;
+    // Try extracting YYYY-MM-DD via string split (handles SQLite + ISO formats)
+    const d = trimmed.split("T")[0].split(" ")[0].trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    // Fallback: let JS Date parse anything else (un-padded, locale strings, etc.)
+    try {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) return parsed.toISOString().split("T")[0];
+    } catch {}
+    return today;
   };
 
   const urlTag = (loc: string, lastmod: string, priority: string, changefreq: string) =>

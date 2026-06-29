@@ -138,7 +138,7 @@ export default function JobDetail() {
     { icon: "ri-truck-line", label: "Equipment", value: job.equipment },
     { icon: "ri-time-line", label: "Experience", value: job.experienceRequired },
     { icon: "ri-settings-line", label: "Truck", value: job.truckInfo },
-  ];
+  ].filter((h) => h.value);
 
   return (
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text">
@@ -247,8 +247,8 @@ export default function JobDetail() {
                 </span>
               </div>
 
-              {/* Key Highlights Grid */}
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {/* Key Highlights Grid — only shown if at least one value is populated */}
+              {highlights.length > 0 && <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {highlights.map((h) => (
                   <div
                     key={h.label}
@@ -263,7 +263,7 @@ export default function JobDetail() {
                     </p>
                   </div>
                 ))}
-              </div>
+              </div>}
             </div>
 
             {/* Description */}
@@ -271,39 +271,49 @@ export default function JobDetail() {
               <h2 className="font-heading text-lg font-bold text-brand-text">
                 About This Position
               </h2>
-              <p className="mt-3 text-sm leading-relaxed text-brand-text-secondary">
-                {job.description}
-              </p>
+              {/* dangerouslySetInnerHTML renders HTML from scraped job descriptions correctly */}
+              <div
+                className="mt-3 text-sm leading-relaxed text-brand-text-secondary [&_b]:font-semibold [&_strong]:font-semibold [&_ul]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mt-1 [&_p]:mt-2"
+                dangerouslySetInnerHTML={{ __html: job.description }}
+              />
 
-              <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-brand-text">
-                Benefits
-              </h3>
-              <ul className="mt-3 space-y-2">
-                {job.benefits.map((benefit, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-brand-text-secondary"
-                  >
-                    <i className="ri-check-line mt-0.5 text-brand-orange" />
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
+              {job.benefits.length > 0 && (
+                <>
+                  <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-brand-text">
+                    Benefits
+                  </h3>
+                  <ul className="mt-3 space-y-2">
+                    {job.benefits.map((benefit, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-sm text-brand-text-secondary"
+                      >
+                        <i className="ri-check-line mt-0.5 text-brand-orange" />
+                        {benefit}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
-              <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-brand-text">
-                Requirements
-              </h3>
-              <ul className="mt-3 space-y-2">
-                {job.requirements.map((req, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-brand-text-secondary"
-                  >
-                    <i className="ri-checkbox-blank-circle-fill mt-1.5 text-[6px] text-brand-text-muted" />
-                    {req}
-                  </li>
-                ))}
-              </ul>
+              {job.requirements.length > 0 && (
+                <>
+                  <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-brand-text">
+                    Requirements
+                  </h3>
+                  <ul className="mt-3 space-y-2">
+                    {job.requirements.map((req, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-sm text-brand-text-secondary"
+                      >
+                        <i className="ri-checkbox-blank-circle-fill mt-1.5 text-[6px] text-brand-text-muted" />
+                        {req}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           </div>
 

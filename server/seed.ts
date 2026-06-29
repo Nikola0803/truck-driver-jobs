@@ -8,6 +8,7 @@
 import { db, stringifyRow } from "./db.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
+import { seedBlogPosts } from "./seeds/blog-posts.js";
 
 // ── Admin user ────────────────────────────────────────────────────────────
 
@@ -102,6 +103,9 @@ if (groupCount === 0) {
 } else {
   console.log(`ℹ️  Groups already seeded (${groupCount} rows)`);
 }
+
+// ── Seed blog posts ───────────────────────────────────────────────────────
+seedBlogPosts();
 
 console.log("\n✅ Seed complete. Run `npm run dev` to start.");
 db.close();

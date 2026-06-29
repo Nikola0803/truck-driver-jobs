@@ -23,6 +23,10 @@ import {
   sendQuickApplyAlert,
   sendDailyDigest,
 } from "./email.js";
+import { seedBlogPosts } from "./seeds/blog-posts.js";
+
+// Auto-seed blog posts on every startup (INSERT OR IGNORE — never overwrites admin edits)
+try { seedBlogPosts(); } catch (e) { console.warn("Blog seed skipped:", e); }
 
 const app = new Hono();
 

@@ -216,6 +216,8 @@ const migrations = [
   `ALTER TABLE applications ADD COLUMN applicant_email TEXT`,
   `ALTER TABLE applications ADD COLUMN applicant_phone TEXT`,
   `ALTER TABLE applications ADD COLUMN consent_given INTEGER DEFAULT 0`,
+  `ALTER TABLE blog_posts ADD COLUMN featured INTEGER DEFAULT 0`,
+  `ALTER TABLE blog_posts ADD COLUMN meta_description TEXT`,
 ];
 
 for (const sql of migrations) {

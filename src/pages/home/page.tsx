@@ -365,13 +365,13 @@ export default function Home() {
                   to="/signup"
                   className="rounded-lg bg-brand-orange px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
                 >
-                  Get Owner-Op Leads
+                  Find Owner-Op Jobs
                 </Link>
                 <Link
                   to="/blog"
                   className="rounded-lg border border-brand-border px-6 py-3 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange whitespace-nowrap"
                 >
-                  Read O/O Guide
+                  O/O Earnings Guide
                 </Link>
               </div>
             </div>

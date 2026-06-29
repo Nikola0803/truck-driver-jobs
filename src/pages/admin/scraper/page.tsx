@@ -53,6 +53,64 @@ export default function ScraperPage() {
   const [adzunaResult, setAdzunaResult] = useState<{ total: number; inserted: number; updated: number } | null>(null);
   const [adzunaError, setAdzunaError] = useState("");
 
+  // Jobicy state
+  const [jobicyRunning, setJobicyRunning] = useState(false);
+  const [jobicyResult, setJobicyResult] = useState<{ total: number; inserted: number; updated: number } | null>(null);
+  const [jobicyError, setJobicyError] = useState("");
+
+  const runJobicy = async () => {
+    setJobicyRunning(true);
+    setJobicyResult(null);
+    setJobicyError("");
+    try {
+      const res = await fetch("/api/admin/scrape/jobicy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("tdj_token")}`,
+        },
+        body: JSON.stringify({ import: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setJobicyError(data.message ?? "Failed"); return; }
+      setJobicyResult({ total: data.total, inserted: data.inserted, updated: data.updated });
+      await loadCarriers();
+    } catch {
+      setJobicyError("Network error — is the server running?");
+    } finally {
+      setJobicyRunning(false);
+    }
+  };
+
+  // Indeed RSS state
+  const [indeedRunning, setIndeedRunning] = useState(false);
+  const [indeedResult, setIndeedResult] = useState<{ total: number; inserted: number; updated: number } | null>(null);
+  const [indeedError, setIndeedError] = useState("");
+
+  const runIndeed = async () => {
+    setIndeedRunning(true);
+    setIndeedResult(null);
+    setIndeedError("");
+    try {
+      const res = await fetch("/api/admin/scrape/indeed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("tdj_token")}`,
+        },
+        body: JSON.stringify({ import: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setIndeedError(data.message ?? "Failed"); return; }
+      setIndeedResult({ total: data.total, inserted: data.inserted, updated: data.updated });
+      await loadCarriers();
+    } catch {
+      setIndeedError("Network error — is the server running?");
+    } finally {
+      setIndeedRunning(false);
+    }
+  };
+
   // JSearch state
   const [jsearchRunning, setJsearchRunning] = useState(false);
   const [jsearchResult, setJsearchResult] = useState<{ total: number; inserted: number; updated: number } | null>(null);
@@ -63,7 +121,7 @@ export default function ScraperPage() {
     setJsearchResult(null);
     setJsearchError("");
     try {
-      const res = await fetch("/api/admin/scrape/jobicy", {
+      const res = await fetch("/api/admin/scrape/jsearch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -313,14 +371,80 @@ export default function ScraperPage() {
             </button>
           </div>
 
-          {/* JSearch */}
+          {/* Jobicy */}
           <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-foreground-950">Jobicy</p>
                 <p className="text-xs text-foreground-500">Free job API · no key required</p>
               </div>
-              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">LIVE</span>
+              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">FREE</span>
+            </div>
+            {jobicyResult && (
+              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                <i className="ri-check-line mr-1" />
+                Imported {jobicyResult.total} jobs — {jobicyResult.inserted} new, {jobicyResult.updated} updated
+              </div>
+            )}
+            {jobicyError && (
+              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+                {jobicyError}
+              </div>
+            )}
+            <button
+              onClick={runJobicy}
+              disabled={jobicyRunning}
+              className="w-full rounded-lg bg-primary-500 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
+            >
+              {jobicyRunning ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin" /> Fetching jobs...
+                </span>
+              ) : "Fetch + Import Jobs"}
+            </button>
+          </div>
+
+          {/* Indeed RSS */}
+          <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground-950">Indeed RSS</p>
+                <p className="text-xs text-foreground-500">Free · no key · 12 CDL queries</p>
+              </div>
+              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700">FREE</span>
+            </div>
+            {indeedResult && (
+              <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                <i className="ri-check-line mr-1" />
+                Imported {indeedResult.total} jobs — {indeedResult.inserted} new, {indeedResult.updated} updated
+              </div>
+            )}
+            {indeedError && (
+              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+                {indeedError}
+              </div>
+            )}
+            <button
+              onClick={runIndeed}
+              disabled={indeedRunning}
+              className="w-full rounded-lg bg-primary-500 py-2.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
+            >
+              {indeedRunning ? (
+                <span className="flex items-center justify-center gap-2">
+                  <i className="ri-loader-4-line animate-spin" /> Fetching CDL jobs...
+                </span>
+              ) : "Fetch + Import Jobs"}
+            </button>
+          </div>
+
+          {/* JSearch */}
+          <div className="rounded-lg border border-brand-border bg-brand-bg p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground-950">JSearch (RapidAPI)</p>
+                <p className="text-xs text-foreground-500">Indeed + LinkedIn + ZipRecruiter + Glassdoor</p>
+              </div>
+              <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-[10px] font-bold text-yellow-700">NEEDS KEY</span>
             </div>
             {jsearchResult && (
               <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">

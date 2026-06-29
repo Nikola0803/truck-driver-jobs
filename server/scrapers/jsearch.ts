@@ -97,17 +97,18 @@ export async function fetchJSearchJobs(rapidApiKey: string): Promise<ScrapedJob[
       const url = new URL(BASE);
       url.searchParams.set("query", query);
       url.searchParams.set("page", "1");
-      url.searchParams.set("num_pages", "2"); // 20 results per query
+      url.searchParams.set("num_pages", "1"); // 10 results per call — 8 queries = 8 API calls/run
       url.searchParams.set("country", "us");
       url.searchParams.set("date_posted", "month");
 
       const res = await fetch(url.toString(), {
+        method: "GET",
         headers: {
+          "Content-Type": "application/json",
           "x-rapidapi-host": "jsearch.p.rapidapi.com",
           "x-rapidapi-key": rapidApiKey,
-          "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(20_000),
       });
 
       if (!res.ok) {

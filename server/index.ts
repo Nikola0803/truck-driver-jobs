@@ -16,6 +16,8 @@ import { fetchJobicyJobs } from "./scrapers/jobicy.js";
 import { fetchUSAJobsJobs } from "./scrapers/usajobs.js";
 import { registerScheduledTask } from "./scheduler.js";
 import { fetchCareerjetJobs } from "./scrapers/careerjet.js";
+import { fetchJSearchJobs } from "./scrapers/jsearch.js";
+import { fetchIndeedJobs } from "./scrapers/indeed-rss.js";
 import type { ScrapedJob } from "./scrapers/types.js";
 import {
   sendAdminLeadAlert,
@@ -607,67 +609,44 @@ app.post("/api/admin/scrape/adzuna", async (c) => {
   }
 });
 
-/** POST /api/admin/scrape/jobicy — fetch CDL jobs from Jobicy (free, no key), optionally import */
+/** POST /api/admin/scrape/indeed — fetch CDL jobs from Indeed RSS (free, no key) */
+app.post("/api/admin/scrape/indeed", async (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const { import: doImport = false } = await c.req.json().catch(() => ({}));
+  try {
+    const jobs = await fetchIndeedJobs();
+    if (!doImport) return c.json({ jobs, count: jobs.length });
+    const { inserted, updated } = upsertJobs(jobs);
+    return c.json({ ok: true, total: jobs.length, inserted, updated });
+  } catch (e: any) {
+    return c.json({ message: e?.message ?? "Indeed RSS fetch failed" }, 500);
+  }
+});
+
+/** POST /api/admin/scrape/jsearch — fetch CDL jobs from JSearch (aggregates Indeed, LinkedIn, ZipRecruiter) */
+app.post("/api/admin/scrape/jsearch", async (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) return c.json({ message: "RAPIDAPI_KEY not set in environment variables. Get a free key at rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch" }, 500);
+  const { import: doImport = false } = await c.req.json().catch(() => ({}));
+  try {
+    const jobs = await fetchJSearchJobs(apiKey);
+    if (!doImport) return c.json({ jobs, count: jobs.length });
+    const { inserted, updated } = upsertJobs(jobs);
+    return c.json({ ok: true, total: jobs.length, inserted, updated });
+  } catch (e: any) {
+    return c.json({ message: e?.message ?? "JSearch fetch failed" }, 500);
+  }
+});
+
+/** POST /api/admin/scrape/jobicy — fetch CDL jobs from Jobicy (free, no key) */
 app.post("/api/admin/scrape/jobicy", async (c) => {
   const denied = requireAdmin(c); if (denied) return denied;
-
   const { import: doImport = false } = await c.req.json().catch(() => ({}));
-
   try {
     const jobs = await fetchJobicyJobs();
-
-    if (!doImport) {
-      return c.json({ jobs, count: jobs.length });
-    }
-
-    let inserted = 0, updated = 0;
-    const now = new Date().toISOString();
-
-    for (const job of jobs) {
-      const existing = db.prepare(
-        "SELECT id FROM jobs WHERE title = ? AND company = ? LIMIT 1"
-      ).get(job.title, job.company) as any;
-
-      const row = {
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        city: job.city ?? null,
-        state: job.state ?? null,
-        route_type: job.route_type ?? null,
-        equipment: job.equipment ?? "Dry Van",
-        home_time: job.home_time ?? null,
-        description: job.description ?? null,
-        pay_rate: job.pay_rate ?? null,
-        pay_period: job.pay_period ?? null,
-        benefits: "[]",
-        requirements: "[]",
-        source_url: job.source_url,
-        source_carrier: job.source_carrier,
-        external_apply_url: job.external_apply_url ?? null,
-        is_aggregated: 1,
-        scraped_at: now,
-        status: "active",
-      };
-
-      if (existing) {
-        db.prepare(
-          `UPDATE jobs SET route_type=?, equipment=?, home_time=?, description=?,
-           pay_rate=?, pay_period=?, source_url=?, scraped_at=?, updated_at=? WHERE id=?`
-        ).run(
-          row.route_type, row.equipment, row.home_time, row.description,
-          row.pay_rate, row.pay_period, row.source_url, now, now, existing.id
-        );
-        updated++;
-      } else {
-        const cols = Object.keys(row);
-        db.prepare(
-          `INSERT INTO jobs (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`
-        ).run(...cols.map((k) => (row as any)[k]));
-        inserted++;
-      }
-    }
-
+    if (!doImport) return c.json({ jobs, count: jobs.length });
+    const { inserted, updated } = upsertJobs(jobs);
     return c.json({ ok: true, total: jobs.length, inserted, updated });
   } catch (e: any) {
     return c.json({ message: e?.message ?? "Jobicy fetch failed" }, 500);
@@ -1219,33 +1198,76 @@ function upsertJobs(jobs: ScrapedJob[]): { inserted: number; updated: number } {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Nightly auto-scrape schedule (all times UTC = roughly 2-5 AM EST)
-// Adzuna  → 07:00 UTC (2:00 AM EST / 3:00 AM EDT)
-// JSearch → 07:30 UTC (2:30 AM EST)
-// USAJOBS → 08:00 UTC (3:00 AM EST)
+// Nightly auto-scrape schedule (UTC — roughly 2–5 AM EST)
+//
+//  06:00 — Jobicy        (free, no key)
+//  06:30 — Indeed RSS    (free, no key — CDL jobs from Indeed's public RSS)
+//  07:00 — JSearch       (aggregates Indeed + LinkedIn + ZipRecruiter + Glassdoor)
+//  07:30 — Adzuna        (requires ADZUNA_APP_ID + ADZUNA_APP_KEY)
+//  08:00 — USAJOBS       (requires USAJOBS_API_KEY + USAJOBS_USER_AGENT)
+//  08:30 — Careerjet     (requires CAREERJET_AFFID)
+//
+// Env vars — add to .env on Hostinger VPS:
+//   RAPIDAPI_KEY  — get at rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch
+//   ADZUNA_APP_ID / ADZUNA_APP_KEY — free at developer.adzuna.com
+//   USAJOBS_API_KEY / USAJOBS_USER_AGENT — free at usajobs.gov/api/
+//   CAREERJET_AFFID — affiliate ID from careerjet.com
 // ────────────────────────────────────────────────────────────────────────
+
 registerScheduledTask({
-  name: "Adzuna nightly import",
-  hourUTC: 7,
+  name: "Jobicy nightly import",
+  hourUTC: 6,
   minuteUTC: 0,
   fn: async () => {
-    const appId = process.env.ADZUNA_APP_ID;
-    const appKey = process.env.ADZUNA_APP_KEY;
-    if (!appId || !appKey) { console.warn("[Auto] Adzuna keys missing"); return; }
-    const jobs = await fetchAdzunaJobs(appId, appKey);
-    const { inserted, updated } = upsertJobs(jobs);
-    console.log(`[Auto/Adzuna] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    try {
+      const jobs = await fetchJobicyJobs();
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/Jobicy] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/Jobicy] Failed:", e); }
   },
 });
 
 registerScheduledTask({
-  name: "Jobicy nightly import",
+  name: "Indeed RSS nightly import",
+  hourUTC: 6,
+  minuteUTC: 30,
+  fn: async () => {
+    try {
+      const jobs = await fetchIndeedJobs();
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/Indeed] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/Indeed] Failed:", e); }
+  },
+});
+
+registerScheduledTask({
+  name: "JSearch nightly import",
+  hourUTC: 7,
+  minuteUTC: 0,
+  fn: async () => {
+    const apiKey = process.env.RAPIDAPI_KEY;
+    if (!apiKey) { console.warn("[Auto] RAPIDAPI_KEY missing — skipping"); return; }
+    try {
+      const jobs = await fetchJSearchJobs(apiKey);
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/JSearch] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/JSearch] Failed:", e); }
+  },
+});
+
+registerScheduledTask({
+  name: "Adzuna nightly import",
   hourUTC: 7,
   minuteUTC: 30,
   fn: async () => {
-    const jobs = await fetchJobicyJobs();
-    const { inserted, updated } = upsertJobs(jobs);
-    console.log(`[Auto/Jobicy] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    const appId = process.env.ADZUNA_APP_ID;
+    const appKey = process.env.ADZUNA_APP_KEY;
+    if (!appId || !appKey) { console.warn("[Auto] Adzuna keys missing — skipping"); return; }
+    try {
+      const jobs = await fetchAdzunaJobs(appId, appKey);
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/Adzuna] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/Adzuna] Failed:", e); }
   },
 });
 
@@ -1256,10 +1278,12 @@ registerScheduledTask({
   fn: async () => {
     const apiKey = process.env.USAJOBS_API_KEY;
     const userAgent = process.env.USAJOBS_USER_AGENT;
-    if (!apiKey || !userAgent) { console.warn("[Auto] USAJOBS keys missing"); return; }
-    const jobs = await fetchUSAJobsJobs(apiKey, userAgent);
-    const { inserted, updated } = upsertJobs(jobs);
-    console.log(`[Auto/USAJOBS] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    if (!apiKey || !userAgent) { console.warn("[Auto] USAJOBS keys missing — skipping"); return; }
+    try {
+      const jobs = await fetchUSAJobsJobs(apiKey, userAgent);
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/USAJOBS] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/USAJOBS] Failed:", e); }
   },
 });
 
@@ -1269,10 +1293,12 @@ registerScheduledTask({
   minuteUTC: 30,
   fn: async () => {
     const affId = process.env.CAREERJET_AFFID;
-    if (!affId) { console.warn("[Auto] CAREERJET_AFFID missing"); return; }
-    const jobs = await fetchCareerjetJobs(affId);
-    const { inserted, updated } = upsertJobs(jobs);
-    console.log(`[Auto/Careerjet] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    if (!affId) { console.warn("[Auto] CAREERJET_AFFID missing — skipping"); return; }
+    try {
+      const jobs = await fetchCareerjetJobs(affId);
+      const { inserted, updated } = upsertJobs(jobs);
+      console.log(`[Auto/Careerjet] ${jobs.length} fetched — ${inserted} new, ${updated} updated`);
+    } catch (e) { console.warn("[Auto/Careerjet] Failed:", e); }
   },
 });
 

@@ -113,7 +113,7 @@ export default function Home() {
                 "hiringOrganization": { "@type": "Organization", "name": job.company },
                 "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location } },
                 "occupationalCategory": job.equipment,
-                "url": `${SITE_URL}/jobs/${job.id}`
+                "url": `${SITE_URL}/jobs/${job.slug}`
               }
             }))
           },
@@ -326,7 +326,7 @@ export default function Home() {
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-xs text-brand-text-muted">{job.postedAt}</span>
                   <Link
-                    to={`/jobs/${job.id}`}
+                    to={`/jobs/${job.slug}`}
                     className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover whitespace-nowrap"
                   >
                     View Details

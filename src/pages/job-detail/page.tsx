@@ -9,6 +9,7 @@ import ApplyModal from "@/components/feature/ApplyModal";
 import SITE_URL from "@/lib/siteUrl";
 import { dbJobToJob } from "@/lib/jobMapper";
 import type { Job } from "@/mocks/jobs";
+import { toJobSlug } from "@/lib/jobSlug";
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -29,7 +30,7 @@ export default function JobDetail() {
     supabase
       .from("jobs")
       .select("*")
-      .eq("id", Number(id))
+      .eq("id", parseInt(id, 10))
       .maybeSingle()
       .then(({ data }) => {
         const mapped = data ? dbJobToJob(data) : null;
@@ -59,9 +60,10 @@ export default function JobDetail() {
   useEffect(() => {
     if (!user || !id) return;
     const checkStatus = async () => {
+      const numId = parseInt(id, 10);
       const [savedRes, appRes] = await Promise.all([
-        supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", Number(id)),
-        supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", Number(id)),
+        supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", numId),
+        supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", numId),
       ]);
       setSaved((savedRes.data ?? []).length > 0);
       setApplied((appRes.data ?? []).length > 0);
@@ -110,11 +112,12 @@ export default function JobDetail() {
     if (!user) return;
     setSaving(true);
     try {
+      const numId = parseInt(id!, 10);
       if (saved) {
-        await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", Number(id));
+        await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", numId);
         setSaved(false);
       } else {
-        await supabase.from("saved_jobs").insert({ user_id: user.id, job_id: Number(id) });
+        await supabase.from("saved_jobs").insert({ user_id: user.id, job_id: numId });
         setSaved(true);
       }
     } catch {
@@ -143,7 +146,7 @@ export default function JobDetail() {
         title={`${job.title} at ${job.company} | CDL Trucking Job`}
         description={`${job.title} at ${job.company} in ${job.location}. ${job.routeType} route, ${job.equipment} equipment, ${job.homeTime} home time. ${job.description.slice(0, 150)}`}
         keywords={`CDL job, trucking job, ${job.equipment}, ${job.routeType}, ${job.location}, Class A CDL, ${job.company}`}
-        canonicalUrl={`${SITE_URL}/jobs/${job.id}`}
+        canonicalUrl={`${SITE_URL}/jobs/${job.slug}`}
         jsonLd={[
           {
             "@context": "https://schema.org",
@@ -199,7 +202,7 @@ export default function JobDetail() {
             "occupationalCategory": job.equipment,
             "qualifications": job.requirements.join(", "),
             "jobBenefits": job.benefits.join(", "),
-            "url": `${SITE_URL}/jobs/${job.id}`
+            "url": `${SITE_URL}/jobs/${job.slug}`
           }
         ]}
       />
@@ -460,7 +463,7 @@ export default function JobDetail() {
                 {similarJobs.map((similar) => (
                   <button
                     key={similar.id}
-                    onClick={() => navigate(`/jobs/${similar.id}`)}
+                    onClick={() => navigate(`/jobs/${similar.slug}`)}
                     className="w-full rounded-lg bg-brand-bg p-3 text-left transition-colors hover:bg-brand-orange-light"
                   >
                     <p className="text-sm font-semibold text-brand-text">

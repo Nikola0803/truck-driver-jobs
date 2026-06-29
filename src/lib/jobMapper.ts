@@ -1,9 +1,11 @@
 import type { Job } from "@/mocks/jobs";
+import { toJobSlug } from "@/lib/jobSlug";
 
 /** Converts a DB `jobs` row (snake_case) → camelCase `Job` interface */
 export function dbJobToJob(row: Record<string, any>): Job {
   return {
     id: String(row.id),
+    slug: toJobSlug(row.id, row.title ?? "", row.company ?? ""),
     title: row.title ?? "",
     company: row.company ?? "",
     location: row.location ?? "",

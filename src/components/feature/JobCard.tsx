@@ -137,7 +137,7 @@ export default function JobCard({ job, onApply, onSave, isSaved, isApplied, show
         <span className="text-xs text-brand-text-muted">{job.postedAt}</span>
         <div className="flex items-center gap-2">
           <Link
-            to={`/jobs/${job.id}`}
+            to={`/jobs/${job.slug}`}
             className="rounded-lg border border-brand-border px-4 py-2 text-center text-sm font-semibold text-brand-text transition-colors hover:border-brand-text hover:bg-brand-bg"
           >
             View Job

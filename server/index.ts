@@ -1120,8 +1120,8 @@ app.get("/sitemap.xml", (c) => {
   ];
 
   const jobs = db.prepare(
-    "SELECT id, updated_at, created_at FROM jobs WHERE status = 'active' ORDER BY created_at DESC LIMIT 5000"
-  ).all() as { id: number; updated_at: string | null; created_at: string }[];
+    "SELECT id, title, company, updated_at, created_at FROM jobs WHERE status = 'active' ORDER BY created_at DESC LIMIT 5000"
+  ).all() as { id: number; title: string; company: string; updated_at: string | null; created_at: string }[];
 
   const posts = db.prepare(
     "SELECT slug, updated_at, published_at FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC"
@@ -1133,7 +1133,7 @@ app.get("/sitemap.xml", (c) => {
     `  <url>\n    <loc>${esc(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 
   const staticUrls = staticPages.map((p) => urlTag(p.loc, today, p.priority, p.changefreq));
-  const jobUrls = jobs.map((j) => urlTag(`${DOMAIN}/jobs/${j.id}`, (j.updated_at ?? j.created_at ?? today).split("T")[0], "0.8", "weekly"));
+  const jobUrls = jobs.map((j) => urlTag(`${DOMAIN}/jobs/${toJobSlug(j.id, j.title ?? "", j.company ?? "")}`, (j.updated_at ?? j.created_at ?? today).split("T")[0], "0.8", "weekly"));
   const blogUrls = posts.map((p) => urlTag(`${DOMAIN}/blog/${p.slug}`, (p.updated_at ?? p.published_at ?? today).split("T")[0], "0.6", "monthly"));
 
   const xml = [
@@ -1317,6 +1317,15 @@ registerScheduledTask({
 // Serves the built React app from out/ and falls back to index.html for SPA routing
 const STATIC_DIR = resolve(process.cwd(), "out");
 
+// ── Job slug helper (mirrors src/lib/jobSlug.ts) ─────────────────────────
+function toJobSlug(id: number, title: string, company: string): string {
+  const text = `${title}-at-${company}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${id}-${text}`;
+}
+
 // ── Server-side SEO injection ─────────────────────────────────────────────
 // Intercepts job detail pages and injects correct title/meta/JSON-LD into
 // the initial HTML so Googlebot sees full SEO data without executing JS.
@@ -1375,7 +1384,9 @@ const EQUIPMENT_SLUGS: Record<string, string> = {
 if (existsSync(STATIC_DIR)) {
   // Job detail pages — inject SEO before serving SPA shell
   app.get("/jobs/:id", (c) => {
-    const id = Number(c.req.param("id"));
+    // Support both "/jobs/16" (legacy) and "/jobs/16-otr-dry-van-driver-at-werner" (slug)
+    const rawId = c.req.param("id");
+    const id = parseInt(rawId, 10); // parseInt stops at first non-digit, so both formats work
     let html: string;
     try {
       html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8");
@@ -1390,7 +1401,8 @@ if (existsSync(STATIC_DIR)) {
     if (!job) return c.html(html); // unknown job — serve SPA as-is
 
     const DOMAIN = "https://truckdriverjobs.co";
-    const canonical = `${DOMAIN}/jobs/${job.id}`;
+    const jobSlug = toJobSlug(job.id, job.title ?? "", job.company ?? "");
+    const canonical = `${DOMAIN}/jobs/${jobSlug}`;
     const titleText = `${job.title} at ${job.company} | CDL Trucking Job`;
     const descText = [
       `${job.title} at ${job.company} in ${job.location}.`,

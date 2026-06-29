@@ -1,5 +1,6 @@
 export interface Job {
   id: string;
+  slug: string; // SEO-friendly URL segment, e.g. "16-otr-dry-van-driver-at-werner-enterprises"
   title: string;
   company: string;
   location: string;

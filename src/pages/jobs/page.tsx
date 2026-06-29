@@ -26,6 +26,7 @@ export default function JobsList() {
   const [appliedJobIds, setAppliedJobIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
 
+  const [visibleCount, setVisibleCount] = useState(24);
   const [filters, setFilters] = useState({
     routeType: [] as string[],
     equipment: [] as string[],
@@ -121,6 +122,14 @@ export default function JobsList() {
     return result;
   }, [allJobs, activeCategory, filters, sortBy]);
 
+  // Reset pagination when filters change
+  const setFiltersAndReset = (f: typeof filters) => { setFilters(f); setVisibleCount(24); };
+  const setCategoryAndReset = (c: string) => { setActiveCategory(c); setVisibleCount(24); };
+  const setSortAndReset = (s: string) => { setSortBy(s); setVisibleCount(24); };
+
+  const visibleJobs = filteredJobs.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredJobs.length;
+
   const handleQuickApply = (jobId: string) => {
     setApplyJobId(jobId);
     setApplyOpen(true);
@@ -171,7 +180,7 @@ export default function JobsList() {
               "hiringOrganization": { "@type": "Organization", "name": job.company },
               "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": job.location } },
               "occupationalCategory": job.equipment,
-              "url": `${SITE_URL}/jobs/${job.id}`
+              "url": `${SITE_URL}/jobs/${job.slug}`
             }
           }))
         }}
@@ -189,26 +198,25 @@ export default function JobsList() {
 
         <CategoryChips
           activeCategory={activeCategory}
-          onChange={setActiveCategory}
+          onChange={setCategoryAndReset}
           counts={categoryCounts}
         />
 
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="w-full shrink-0 lg:w-64">
-            <JobFilters jobs={allJobs} activeFilters={filters} onChange={setFilters} />
+            <JobFilters jobs={allJobs} activeFilters={filters} onChange={setFiltersAndReset} />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-brand-text-secondary">
-                Showing <span className="font-bold text-brand-text">{filteredJobs.length}</span> CDL jobs
-                {filteredJobs.length < allJobs.length && <span> of {allJobs.length} total</span>}
+                Showing <span className="font-bold text-brand-text">{visibleJobs.length}</span> of <span className="font-bold text-brand-text">{filteredJobs.length}</span> CDL jobs
               </p>
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold text-brand-text-muted">Sort by:</label>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
+                  onChange={(e) => setSortAndReset(e.target.value)}
                   className="rounded-lg border border-brand-border bg-brand-surface px-3 py-1.5 text-sm text-brand-text outline-none focus:border-brand-orange"
                 >
                   <option value="relevance">Relevance</option>
@@ -237,18 +245,30 @@ export default function JobsList() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {filteredJobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    onApply={handleQuickApply}
-                    onSave={handleSave}
-                    isSaved={savedJobIds.has(Number(job.id))}
-                    isApplied={appliedJobIds.has(Number(job.id))}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid gap-4">
+                  {visibleJobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      onApply={handleQuickApply}
+                      onSave={handleSave}
+                      isSaved={savedJobIds.has(Number(job.id))}
+                      isApplied={appliedJobIds.has(Number(job.id))}
+                    />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="mt-8 text-center">
+                    <button
+                      onClick={() => setVisibleCount((n) => n + 24)}
+                      className="rounded-lg border border-brand-border bg-brand-surface px-8 py-3 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange"
+                    >
+                      Load More Jobs ({filteredJobs.length - visibleCount} remaining)
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

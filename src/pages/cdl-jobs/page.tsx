@@ -156,7 +156,7 @@ export default function CdlJobsPage() {
                   </div>
                   <div>
                     <h2 className="font-semibold text-brand-text">
-                      <Link to={`/jobs/${job.id}`} className="hover:text-brand-orange">{job.title}</Link>
+                      <Link to={`/jobs/${job.slug}`} className="hover:text-brand-orange">{job.title}</Link>
                     </h2>
                     <p className="text-sm text-brand-text-secondary">{job.company} · {job.location}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -167,7 +167,7 @@ export default function CdlJobsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Link to={`/jobs/${job.id}`}
+                  <Link to={`/jobs/${job.slug}`}
                     className="rounded-lg border border-brand-border px-4 py-2 text-sm font-semibold text-brand-text transition-colors hover:border-brand-orange hover:text-brand-orange">
                     Details
                   </Link>

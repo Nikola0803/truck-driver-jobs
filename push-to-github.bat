@@ -43,7 +43,7 @@ if %errorlevel% == 0 (
 :: Push
 echo  Pushing to github.com/Nikola0803/truck-driver-jobs ...
 echo.
-git push -u origin main
+git push -u origin main --force
 
 echo.
 if %errorlevel% == 0 (

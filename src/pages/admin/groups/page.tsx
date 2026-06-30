@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import GroupFormModal from "./components/GroupFormModal";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -18,7 +18,7 @@ export default function GroupsList() {
 
   const loadGroups = () => {
     setLoading(true);
-    supabase
+    db
       .from("recruitment_groups")
       .select("*, posts_count, last_post_status, last_post_error, fb_group_id")
       .order("priority")
@@ -54,7 +54,7 @@ export default function GroupsList() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this group? This action cannot be undone.")) return;
-    await supabase.from("recruitment_groups").delete().eq("id", id);
+    await db.from("recruitment_groups").delete().eq("id", id);
     loadGroups();
   };
 

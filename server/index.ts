@@ -153,7 +153,7 @@ const PUBLIC_TABLES = new Set(["jobs", "blog_posts", "recruitment_groups"]);
 const ALLOWED_TABLES = new Set([
   "jobs", "profiles", "saved_jobs", "applications",
   "campaigns", "content_templates", "recruitment_groups",
-  "queued_posts", "published_posts", "blog_posts",
+  "queued_posts", "published_posts", "blog_posts", "analytics_events",
 ]);
 
 // Parse PostgREST-style select: "*, campaigns(name), recruitment_groups(name, url)"
@@ -277,6 +277,106 @@ function nestJoinCols(row: Record<string, any>, joinAliases: string[]): Record<s
 
 // Health check — must be before generic /api/:table handlers
 app.get("/api/health", (c) => c.json({ ok: true, db: "sqlite", version: "1.0.0" }));
+
+/** POST /api/track — public, unauthenticated site-wide analytics event capture (pageviews, clicks, etc.) */
+app.post("/api/track", async (c) => {
+  const body = await c.req.json().catch(() => ({} as any));
+  const {
+    event_type = "pageview",
+    session_id = null,
+    path = null,
+    referrer = null,
+    utm_source = null,
+    utm_medium = null,
+    utm_campaign = null,
+    metadata = {},
+  } = body || {};
+
+  if (!event_type) return c.json({ message: "event_type required" }, 400);
+
+  let referrer_domain: string | null = null;
+  if (referrer) {
+    try { referrer_domain = new URL(referrer).hostname.replace(/^www\./, ""); } catch { /* not a valid URL, ignore */ }
+  }
+
+  const user_agent = c.req.header("user-agent") ?? null;
+
+  db.prepare(
+    `INSERT INTO analytics_events (event_type, session_id, path, referrer, referrer_domain, utm_source, utm_medium, utm_campaign, user_agent, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    event_type, session_id, path, referrer, referrer_domain,
+    utm_source, utm_medium, utm_campaign, user_agent, JSON.stringify(metadata ?? {})
+  );
+
+  return c.json({ ok: true });
+});
+
+/** GET /api/admin/analytics/site — admin-only aggregated site analytics (visitors, top pages, referrers, UTM sources) */
+app.get("/api/admin/analytics/site", (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+
+  const daysParam = parseInt(c.req.query("days") ?? "30", 10);
+  const days = Number.isFinite(daysParam) && daysParam > 0 ? daysParam : 30;
+  const since = `datetime('now', '-${days} days')`;
+
+  const totals = db.prepare(
+    `SELECT
+       COUNT(*) as pageviews,
+       COUNT(DISTINCT session_id) as visitors
+     FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since}`
+  ).get() as { pageviews: number; visitors: number };
+
+  const byDay = db.prepare(
+    `SELECT date(created_at) as day,
+            COUNT(*) as pageviews,
+            COUNT(DISTINCT session_id) as visitors
+     FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since}
+     GROUP BY day ORDER BY day ASC`
+  ).all();
+
+  const topPages = db.prepare(
+    `SELECT path, COUNT(*) as views, COUNT(DISTINCT session_id) as visitors
+     FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since} AND path IS NOT NULL
+     GROUP BY path ORDER BY views DESC LIMIT 15`
+  ).all();
+
+  const topReferrers = db.prepare(
+    `SELECT referrer_domain, COUNT(*) as visits
+     FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since}
+       AND referrer_domain IS NOT NULL AND referrer_domain != ''
+     GROUP BY referrer_domain ORDER BY visits DESC LIMIT 15`
+  ).all();
+
+  const directCount = db.prepare(
+    `SELECT COUNT(*) as c FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since}
+       AND (referrer IS NULL OR referrer = '')`
+  ).get() as { c: number };
+
+  const utmSources = db.prepare(
+    `SELECT utm_source, COUNT(*) as visits
+     FROM analytics_events
+     WHERE event_type = 'pageview' AND created_at >= ${since}
+       AND utm_source IS NOT NULL AND utm_source != ''
+     GROUP BY utm_source ORDER BY visits DESC LIMIT 10`
+  ).all();
+
+  return c.json({
+    days,
+    pageviews: totals.pageviews ?? 0,
+    visitors: totals.visitors ?? 0,
+    directVisits: directCount.c ?? 0,
+    byDay,
+    topPages,
+    topReferrers,
+    utmSources,
+  });
+});
 
 /** POST /api/quick-apply — Quick Apply from job detail page, saves application + notifies admin */
 app.post("/api/quick-apply", async (c) => {

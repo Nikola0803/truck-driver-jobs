@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import SeoHead from "@/components/feature/SeoHead";
@@ -27,7 +27,7 @@ export default function Blog() {
 
   useEffect(() => {
     async function fetchPosts() {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("blog_posts")
         .select("id, slug, title, excerpt, category, read_time, published_at, featured, image_url")
         .order("published_at", { ascending: false });

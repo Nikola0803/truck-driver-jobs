@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// DATA_DIR can be overridden by env var — point to a Railway Volume for persistence
+// DATA_DIR can be overridden by env var — point to a persistent volume on your VPS
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(__dirname, "data");
@@ -203,6 +203,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_leads_email      ON leads (email);
   CREATE INDEX IF NOT EXISTS idx_leads_status     ON leads (status);
   CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads (created_at);
+
+  CREATE TABLE IF NOT EXISTS analytics_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type   TEXT NOT NULL,
+    session_id   TEXT,
+    path         TEXT,
+    referrer     TEXT,
+    referrer_domain TEXT,
+    utm_source   TEXT,
+    utm_medium   TEXT,
+    utm_campaign TEXT,
+    user_agent   TEXT,
+    metadata     TEXT DEFAULT '{}',
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_analytics_event_type  ON analytics_events (event_type);
+  CREATE INDEX IF NOT EXISTS idx_analytics_session     ON analytics_events (session_id);
+  CREATE INDEX IF NOT EXISTS idx_analytics_created_at  ON analytics_events (created_at);
 `);
 
 // ── Migrations: add columns that may not exist yet ──────────────────────

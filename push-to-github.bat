@@ -58,4 +58,6 @@ if %errorlevel% == 0 (
     echo  ============================================
 )
 echo.
+if "%~1"=="/nopause" goto end
 pause
+:end

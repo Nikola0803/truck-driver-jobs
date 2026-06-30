@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import Navbar from "@/components/feature/Navbar";
 import SeoHead from "@/components/feature/SeoHead";
 
@@ -16,7 +16,7 @@ export default function ForgotPassword() {
     setSuccess(false);
     setLoading(true);
 
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error: err } = await db.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import SeoHead from "@/components/feature/SeoHead";
@@ -57,8 +57,8 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     const [savedRes, appsRes] = await Promise.all([
-      supabase.from("saved_jobs").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
-      supabase.from("applications").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
+      db.from("saved_jobs").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
+      db.from("applications").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
     ]);
     setSavedJobs(savedRes.data ?? []);
     setApplications(appsRes.data ?? []);
@@ -66,7 +66,7 @@ export default function Dashboard() {
   };
 
   const removeSavedJob = async (id: number) => {
-    await supabase.from("saved_jobs").delete().eq("id", id);
+    await db.from("saved_jobs").delete().eq("id", id);
     setSavedJobs((prev) => prev.filter((j) => j.id !== id));
   };
 

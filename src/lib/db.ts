@@ -1,5 +1,5 @@
 /**
- * Local DB client — drop-in replacement for @supabase/supabase-js.
+ * Local DB client — drop-in replacement for @db/db-js.
  * Calls the Hono API server at /api/* (proxied by Vite in dev).
  *
  * Supports:
@@ -115,6 +115,7 @@ class QueryBuilder {
   is(col: string, val: "null" | "not.null"): this { this._params.set(col, `is.${val}`); return this; }
   in(col: string, vals: unknown[]): this { this._params.set(col, `in.(${vals.join(",")})`); return this; }
   like(col: string, pattern: string): this { this._params.set(col, `like.${pattern}`); return this; }
+  not(col: string, operator: string, val: unknown): this { this._params.set(col, `not.${operator}.${val}`); return this; }
 
   order(col: string, opts: { ascending?: boolean } = {}): this {
     this._params.append("order", `${col}.${opts.ascending === false ? "desc" : "asc"}`);

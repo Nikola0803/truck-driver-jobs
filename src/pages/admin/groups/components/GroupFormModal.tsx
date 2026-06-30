@@ -52,12 +52,12 @@ export default function GroupFormModal({ group, onClose, onSave }: GroupFormProp
       updated_at: new Date().toISOString(),
     };
 
-    const { supabase } = await import("@/lib/supabase");
+    const { db } = await import("@/lib/db");
 
     if (isEdit) {
-      await supabase.from("recruitment_groups").update(payload).eq("id", group.id);
+      await db.from("recruitment_groups").update(payload).eq("id", group.id);
     } else {
-      await supabase.from("recruitment_groups").insert({ ...payload, created_at: new Date().toISOString() });
+      await db.from("recruitment_groups").insert({ ...payload, created_at: new Date().toISOString() });
     }
 
     setSaving(false);

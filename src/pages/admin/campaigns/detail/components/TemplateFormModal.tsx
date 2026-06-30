@@ -39,12 +39,12 @@ export default function TemplateFormModal({ template, campaignId, onClose, onSav
       updated_at: new Date().toISOString(),
     };
 
-    const { supabase } = await import("@/lib/supabase");
+    const { db } = await import("@/lib/db");
 
     if (isEdit) {
-      await supabase.from("content_templates").update(payload).eq("id", template.id);
+      await db.from("content_templates").update(payload).eq("id", template.id);
     } else {
-      await supabase.from("content_templates").insert({ ...payload, used: false, performance_score: 0, created_at: new Date().toISOString() });
+      await db.from("content_templates").insert({ ...payload, used: false, performance_score: 0, created_at: new Date().toISOString() });
     }
 
     setSaving(false);

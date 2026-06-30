@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 const ROUTE_TYPES = ["OTR", "Regional", "Dedicated", "Local", "Team"];
 const EQUIPMENT_TYPES = ["53'' Dry Van", "53'' Reefer", "48'' Flatbed", "48'' Step Deck", "Tanker", "Day Cab / Box", "Chassis / Container"];
@@ -84,9 +84,9 @@ function JobFormModal({
     };
     let err;
     if (isEdit) {
-      ({ error: err } = await supabase.from("jobs").update(payload).eq("id", job.id));
+      ({ error: err } = await db.from("jobs").update(payload).eq("id", job.id));
     } else {
-      ({ error: err } = await supabase.from("jobs").insert([payload]));
+      ({ error: err } = await db.from("jobs").insert([payload]));
     }
     setSaving(false);
     if (err) { setError(err.message); return; }
@@ -351,7 +351,7 @@ export default function AdminJobs() {
 
   const loadJobs = () => {
     setLoading(true);
-    supabase
+    db
       .from("jobs")
       .select("id, title, company, location, route_type, equipment, pay_rate, pay_period, featured, badge, status, created_at")
       .order("created_at", { ascending: false })
@@ -365,7 +365,7 @@ export default function AdminJobs() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this job listing? This cannot be undone.")) return;
-    await supabase.from("jobs").delete().eq("id", id);
+    await db.from("jobs").delete().eq("id", id);
     loadJobs();
   };
 

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import TemplateFormModal from "./components/TemplateFormModal";
 
 // ── AI Generation helpers ────────────────────────────────────
 async function callGenerateContent(campaign: any, count: number): Promise<string[]> {
-  const { data, error } = await supabase.functions.invoke("generate-content", {
+  const { data, error } = await db.functions.invoke("generate-content", {
     body: { campaign, count },
   });
   if (error) throw new Error(error.message ?? "Generation failed");
@@ -21,7 +21,7 @@ async function saveGeneratedTemplates(campaignId: string, type: string, posts: s
     used: false,
     performance_score: 0,
   }));
-  const { error } = await supabase.from("content_templates").insert(rows);
+  const { error } = await db.from("content_templates").insert(rows);
   if (error) throw new Error(error.message);
 }
 
@@ -69,13 +69,13 @@ export default function CampaignDetail() {
   }, [id]);
 
   const loadEverything = async () => {
-    const { data: c } = await supabase.from("campaigns").select("*").eq("id", id).maybeSingle();
+    const { data: c } = await db.from("campaigns").select("*").eq("id", id).maybeSingle();
     if (!c) { navigate("/admin/campaigns"); return; }
     setCampaign(c);
 
     const [{ data: t }, { data: q }] = await Promise.all([
-      supabase.from("content_templates").select("*").eq("campaign_id", id).order("type").order("variant_index"),
-      supabase.from("queued_posts").select("*, recruitment_groups(name)").eq("campaign_id", id).order("scheduled_at", { ascending: false }),
+      db.from("content_templates").select("*").eq("campaign_id", id).order("type").order("variant_index"),
+      db.from("queued_posts").select("*, recruitment_groups(name)").eq("campaign_id", id).order("scheduled_at", { ascending: false }),
     ]);
     setTemplates(t ?? []);
     setQueuedPosts(q ?? []);
@@ -94,12 +94,12 @@ export default function CampaignDetail() {
 
   const handleDeleteTemplate = async (templateId: number) => {
     if (!confirm("Delete this template?")) return;
-    await supabase.from("content_templates").delete().eq("id", templateId);
+    await db.from("content_templates").delete().eq("id", templateId);
     loadEverything();
   };
 
   const handleToggleUsed = async (t: any) => {
-    await supabase.from("content_templates").update({ used: !t.used }).eq("id", t.id);
+    await db.from("content_templates").update({ used: !t.used }).eq("id", t.id);
     loadEverything();
   };
 

@@ -8,7 +8,7 @@ import ApplyModal from "@/components/feature/ApplyModal";
 import CategoryChips from "@/pages/home/components/CategoryChips";
 import JobFilters from "@/pages/home/components/JobFilters";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import SITE_URL from "@/lib/siteUrl";
 import { dbJobToJob } from "@/lib/jobMapper";
 import type { Job } from "@/mocks/jobs";
@@ -36,7 +36,7 @@ export default function JobsList() {
 
   // Fetch all active jobs from Supabase
   useEffect(() => {
-    supabase
+    db
       .from("jobs")
       .select("*")
       .eq("status", "active")
@@ -55,8 +55,8 @@ export default function JobsList() {
     }
     const fetchUserData = async () => {
       const [savedRes, appsRes] = await Promise.all([
-        supabase.from("saved_jobs").select("job_id").eq("user_id", user.id),
-        supabase.from("applications").select("job_id").eq("user_id", user.id),
+        db.from("saved_jobs").select("job_id").eq("user_id", user.id),
+        db.from("applications").select("job_id").eq("user_id", user.id),
       ]);
       setSavedJobIds(new Set((savedRes.data ?? []).map((s) => s.job_id)));
       setAppliedJobIds(new Set((appsRes.data ?? []).map((a) => a.job_id)));

@@ -7,7 +7,7 @@ import GoogleReviews from "@/components/feature/GoogleReviews";
 import SeoHead from "@/components/feature/SeoHead";
 import JobCard from "@/components/feature/JobCard";
 import ApplyModal from "@/components/feature/ApplyModal";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import SITE_URL from "@/lib/siteUrl";
 import { dbJobToJob } from "@/lib/jobMapper";
 import type { Job } from "@/mocks/jobs";
@@ -41,13 +41,13 @@ export default function Home() {
   useEffect(() => {
     async function fetchJobs() {
       const [featuredRes, countRes] = await Promise.all([
-        supabase
+        db
           .from("jobs")
           .select("*")
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(6),
-        supabase
+        db
           .from("jobs")
           .select("id", { count: "exact", head: true })
           .eq("status", "active"),
@@ -60,7 +60,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchPosts() {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("blog_posts")
         .select("id, slug, title, excerpt, category, read_time, published_at, image_url")
         .order("published_at", { ascending: false })

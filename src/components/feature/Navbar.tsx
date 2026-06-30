@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -111,26 +111,21 @@ export default function Navbar() {
                       </p>
                     </div>
                     <div className="flex flex-col p-2">
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-text"
+                        >
+                          <i className="ri-shield-star-line text-brand-text-muted" />
+                          Admin Dashboard
+                        </Link>
+                      )}
                       <Link
                         to="/dashboard"
                         className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-text"
                       >
                         <i className="ri-dashboard-line text-brand-text-muted" />
                         Dashboard
-                      </Link>
-                      <Link
-                        to="/jobs"
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-text"
-                      >
-                        <i className="ri-briefcase-line text-brand-text-muted" />
-                        Browse Jobs
-                      </Link>
-                      <Link
-                        to="/blog"
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-text"
-                      >
-                        <i className="ri-article-line text-brand-text-muted" />
-                        Blog
                       </Link>
                       <div className="my-1 border-t border-brand-border" />
                       <button
@@ -213,6 +208,15 @@ export default function Navbar() {
             {user ? (
               <>
                 <div className="border-t border-brand-border pt-3" />
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    className="text-sm font-semibold text-brand-text-secondary"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Admin Dashboard
+                  </Link>
+                )}
                 <Link
                   to="/dashboard"
                   className="text-sm font-semibold text-brand-text-secondary"

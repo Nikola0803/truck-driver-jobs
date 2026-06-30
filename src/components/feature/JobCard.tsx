@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { useAuth } from "@/hooks/useAuth";
 import type { Job } from "@/mocks/jobs";
 import { useNavigate } from "react-router-dom";
@@ -49,10 +49,10 @@ export default function JobCard({ job, onApply, onSave, isSaved, isApplied, show
     setSaving(true);
     try {
       if (saved) {
-        const { error } = await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", Number(job.id));
+        const { error } = await db.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", Number(job.id));
         if (!error) { setSaved(false); setToast("Removed from saved"); }
       } else {
-        const { error } = await supabase.from("saved_jobs").insert({ user_id: user.id, job_id: Number(job.id) });
+        const { error } = await db.from("saved_jobs").insert({ user_id: user.id, job_id: Number(job.id) });
         if (!error) { setSaved(true); setToast("Job saved!"); }
       }
       onSave?.(job.id);

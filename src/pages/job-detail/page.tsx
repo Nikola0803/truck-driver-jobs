@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import SeoHead from "@/components/feature/SeoHead";
@@ -27,7 +27,7 @@ export default function JobDetail() {
   // Fetch job from local API
   useEffect(() => {
     if (!id) return;
-    supabase
+    db
       .from("jobs")
       .select("*")
       .eq("id", parseInt(id, 10))
@@ -39,7 +39,7 @@ export default function JobDetail() {
 
         // Fetch similar jobs by equipment type
         if (mapped) {
-          supabase
+          db
             .from("jobs")
             .select("*")
             .eq("equipment", mapped.equipment)
@@ -62,8 +62,8 @@ export default function JobDetail() {
     const checkStatus = async () => {
       const numId = parseInt(id, 10);
       const [savedRes, appRes] = await Promise.all([
-        supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", numId),
-        supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", numId),
+        db.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", numId),
+        db.from("applications").select("id").eq("user_id", user.id).eq("job_id", numId),
       ]);
       setSaved((savedRes.data ?? []).length > 0);
       setApplied((appRes.data ?? []).length > 0);
@@ -114,10 +114,10 @@ export default function JobDetail() {
     try {
       const numId = parseInt(id!, 10);
       if (saved) {
-        await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", numId);
+        await db.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", numId);
         setSaved(false);
       } else {
-        await supabase.from("saved_jobs").insert({ user_id: user.id, job_id: numId });
+        await db.from("saved_jobs").insert({ user_id: user.id, job_id: numId });
         setSaved(true);
       }
     } catch {

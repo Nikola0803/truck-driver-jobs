@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 interface Lead {
   id: number;
@@ -34,6 +34,16 @@ interface PlatformStats {
   blogPosts: number;
 }
 
+interface SiteAnalytics {
+  days: number;
+  pageviews: number;
+  visitors: number;
+  directVisits: number;
+  topPages: { path: string; views: number; visitors: number }[];
+  topReferrers: { referrer_domain: string; visits: number }[];
+  utmSources: { utm_source: string; visits: number }[];
+}
+
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<PlatformStats>({
     totalJobs: 0, activeJobs: 0, totalLeads: 0, leadsLast30: 0, leadsLast7: 0, blogPosts: 0,
@@ -41,9 +51,29 @@ export default function AnalyticsPage() {
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [siteAnalytics, setSiteAnalytics] = useState<SiteAnalytics | null>(null);
+  const [siteLoading, setSiteLoading] = useState(true);
   const [gscUrl, setGscUrl] = useState(() => localStorage.getItem("gsc_property_url") || "");
   const [gscInput, setGscInput] = useState("");
   const [showGscSetup, setShowGscSetup] = useState(false);
+
+  useEffect(() => {
+    async function loadSiteAnalytics() {
+      setSiteLoading(true);
+      try {
+        const token = localStorage.getItem("tdj_token");
+        const res = await fetch("/api/admin/analytics/site?days=30", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) setSiteAnalytics(await res.json());
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSiteLoading(false);
+      }
+    }
+    loadSiteAnalytics();
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -57,7 +87,7 @@ export default function AnalyticsPage() {
           fetch("/api/jobs?count=exact&head=true"),
           fetch("/api/jobs?status=eq.active&count=exact&head=true"),
           fetch("/api/leads?order=created_at.desc&limit=100"),
-          supabase.from("blog_posts").select("id, slug, title, category, published_at, featured").order("published_at", { ascending: false }),
+          db.from("blog_posts").select("id, slug, title, category, published_at, featured").order("published_at", { ascending: false }),
         ]);
 
         const jobsData = await jobsRes.json().catch(() => ({}));
@@ -147,6 +177,85 @@ export default function AnalyticsPage() {
             <p className="mt-1 text-xs text-brand-text-muted">{card.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Site Visitor Analytics */}
+      <div className="mb-8 rounded-xl border border-brand-border bg-brand-surface p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-heading text-sm font-bold text-brand-text">
+            <i className="ri-group-line mr-2 text-brand-text-muted" />
+            Site Visitors (last {siteAnalytics?.days ?? 30} days)
+          </h3>
+        </div>
+
+        {siteLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-border border-t-brand-orange" />
+          </div>
+        ) : !siteAnalytics || siteAnalytics.pageviews === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-center">
+            <p className="text-sm text-brand-text-muted">No visitor data yet — it'll start filling in as people browse the site.</p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg bg-brand-bg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">Unique Visitors</p>
+                <p className="mt-1 font-heading text-2xl font-bold text-brand-text">{siteAnalytics.visitors.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg bg-brand-bg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">Page Views</p>
+                <p className="mt-1 font-heading text-2xl font-bold text-brand-text">{siteAnalytics.pageviews.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg bg-brand-bg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-text-muted">Direct Visits</p>
+                <p className="mt-1 font-heading text-2xl font-bold text-brand-text">{siteAnalytics.directVisits.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Top Pages */}
+              <div>
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-brand-text-muted">Top Pages</h4>
+                {siteAnalytics.topPages.length === 0 ? (
+                  <p className="text-sm text-brand-text-muted">No page data yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {siteAnalytics.topPages.map((p) => (
+                      <div key={p.path} className="flex items-center justify-between rounded-lg bg-brand-bg px-3 py-2">
+                        <span className="text-sm text-brand-text truncate">{p.path}</span>
+                        <span className="ml-3 shrink-0 text-xs font-semibold text-brand-text-muted">{p.views} views</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Top Referrers + UTM sources */}
+              <div>
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-brand-text-muted">Where Visitors Come From</h4>
+                {siteAnalytics.topReferrers.length === 0 && siteAnalytics.utmSources.length === 0 ? (
+                  <p className="text-sm text-brand-text-muted">No referrer data yet — mostly direct traffic so far.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {siteAnalytics.topReferrers.map((r) => (
+                      <div key={r.referrer_domain} className="flex items-center justify-between rounded-lg bg-brand-bg px-3 py-2">
+                        <span className="text-sm text-brand-text truncate">{r.referrer_domain}</span>
+                        <span className="ml-3 shrink-0 text-xs font-semibold text-brand-text-muted">{r.visits} visits</span>
+                      </div>
+                    ))}
+                    {siteAnalytics.utmSources.map((u) => (
+                      <div key={`utm-${u.utm_source}`} className="flex items-center justify-between rounded-lg bg-brand-orange-light px-3 py-2">
+                        <span className="text-sm text-brand-orange truncate">utm: {u.utm_source}</span>
+                        <span className="ml-3 shrink-0 text-xs font-semibold text-brand-orange">{u.visits} visits</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2 mb-8">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 export default function QueuePage() {
   const [queued, setQueued] = useState<any[]>([]);
@@ -9,7 +9,7 @@ export default function QueuePage() {
   const [markingId, setMarkingId] = useState<number | null>(null);
 
   const loadQueue = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await db
       .from("queued_posts")
       .select("*, campaigns(name), recruitment_groups(name, url)")
       .order("scheduled_at", { ascending: true });
@@ -28,12 +28,12 @@ export default function QueuePage() {
 
   const handleMarkPosted = async (q: any) => {
     setMarkingId(q.id);
-    await supabase
+    await db
       .from("queued_posts")
       .update({ status: "published", published_at: new Date().toISOString() })
       .eq("id", q.id);
     // Also log to published_posts if table exists
-    await supabase.from("published_posts").insert([{
+    await db.from("published_posts").insert([{
       queued_post_id: q.id,
       campaign_id: q.campaign_id,
       group_id: q.group_id,

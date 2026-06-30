@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { useAuth } from "@/hooks/useAuth";
 import Navbar from "@/components/feature/Navbar";
 import SeoHead from "@/components/feature/SeoHead";
@@ -65,8 +65,8 @@ export default function AdminCRM() {
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, appsRes] = await Promise.all([
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("applications").select("*").order("created_at", { ascending: false }),
+      db.from("profiles").select("*").order("created_at", { ascending: false }),
+      db.from("applications").select("*").order("created_at", { ascending: false }),
     ]);
     setProfiles(profilesRes.data ?? []);
     setApplications(appsRes.data ?? []);
@@ -76,7 +76,7 @@ export default function AdminCRM() {
   const updateApplicationStatus = async (id: number, status: string, notes?: string) => {
     const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
     if (notes !== undefined) update.notes = notes;
-    await supabase.from("applications").update(update).eq("id", id);
+    await db.from("applications").update(update).eq("id", id);
     setApplications((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status, notes: notes ?? a.notes, updated_at: new Date().toISOString() } : a))
     );

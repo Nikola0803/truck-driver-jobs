@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 function slugify(text: string): string {
   return text
@@ -55,9 +55,9 @@ export default function BlogPostFormModal({ post, onClose, onSave }: BlogPostFor
     };
 
     if (isEdit) {
-      await supabase.from("blog_posts").update(payload).eq("id", post.id);
+      await db.from("blog_posts").update(payload).eq("id", post.id);
     } else {
-      await supabase.from("blog_posts").insert({ ...payload, created_at: new Date().toISOString() });
+      await db.from("blog_posts").insert({ ...payload, created_at: new Date().toISOString() });
     }
 
     setSaving(false);

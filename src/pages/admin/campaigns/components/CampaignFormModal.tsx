@@ -57,12 +57,12 @@ export default function CampaignFormModal({ campaign, onClose, onSave }: Campaig
       updated_at: new Date().toISOString(),
     };
 
-    const { supabase } = await import("@/lib/supabase");
+    const { db } = await import("@/lib/db");
 
     if (isEdit) {
-      await supabase.from("campaigns").update(payload).eq("id", campaign.id);
+      await db.from("campaigns").update(payload).eq("id", campaign.id);
     } else {
-      await supabase.from("campaigns").insert({ ...payload, created_at: new Date().toISOString() });
+      await db.from("campaigns").insert({ ...payload, created_at: new Date().toISOString() });
     }
 
     setSaving(false);

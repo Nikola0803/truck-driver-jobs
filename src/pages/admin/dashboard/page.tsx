@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ campaigns: 0, activeCampaigns: 0, groups: 0, queued: 0, drivers: 0, apps: 0, pendingApps: 0 });
@@ -14,11 +14,11 @@ export default function AdminDashboard() {
 
   const loadDashboard = async () => {
     const [campRes, groupRes, queueRes, profileRes, appRes] = await Promise.all([
-      supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
-      supabase.from("recruitment_groups").select("*"),
-      supabase.from("queued_posts").select("*").eq("status", "pending"),
-      supabase.from("profiles").select("id"),
-      supabase.from("applications").select("*").order("created_at", { ascending: false }),
+      db.from("campaigns").select("*").order("created_at", { ascending: false }),
+      db.from("recruitment_groups").select("*"),
+      db.from("queued_posts").select("*").eq("status", "pending"),
+      db.from("profiles").select("id"),
+      db.from("applications").select("*").order("created_at", { ascending: false }),
     ]);
 
     const campaigns = campRes.data ?? [];

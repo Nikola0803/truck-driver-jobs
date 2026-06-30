@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import BlogPostFormModal from "./components/BlogPostFormModal";
 
 export default function BlogManager() {
@@ -11,7 +11,7 @@ export default function BlogManager() {
 
   const loadPosts = useCallback(() => {
     setLoading(true);
-    supabase.from("blog_posts").select("*").order("published_at", { ascending: false }).then(({ data }) => {
+    db.from("blog_posts").select("*").order("published_at", { ascending: false }).then(({ data }) => {
       setPosts(data ?? []);
       setLoading(false);
     });
@@ -31,12 +31,12 @@ export default function BlogManager() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this blog post permanently?")) return;
-    await supabase.from("blog_posts").delete().eq("id", id);
+    await db.from("blog_posts").delete().eq("id", id);
     loadPosts();
   };
 
   const handleToggleFeatured = async (p: any) => {
-    await supabase.from("blog_posts").update({ featured: !p.featured, updated_at: new Date().toISOString() }).eq("id", p.id);
+    await db.from("blog_posts").update({ featured: !p.featured, updated_at: new Date().toISOString() }).eq("id", p.id);
     loadPosts();
   };
 

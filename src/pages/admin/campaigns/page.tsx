@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import CampaignFormModal from "./components/CampaignFormModal";
 
 export default function CampaignsList() {
@@ -11,7 +11,7 @@ export default function CampaignsList() {
 
   const loadCampaigns = () => {
     setLoading(true);
-    supabase.from("campaigns").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+    db.from("campaigns").select("*").order("created_at", { ascending: false }).then(({ data }) => {
       setCampaigns(data ?? []);
       setLoading(false);
     });
@@ -42,7 +42,7 @@ export default function CampaignsList() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this campaign? Queued posts and templates will remain.")) return;
-    await supabase.from("campaigns").delete().eq("id", id);
+    await db.from("campaigns").delete().eq("id", id);
     loadCampaigns();
   };
 

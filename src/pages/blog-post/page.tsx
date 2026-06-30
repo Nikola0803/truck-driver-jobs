@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/db";
+import { track } from "@/lib/analytics";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import SeoHead from "@/components/feature/SeoHead";
@@ -46,7 +47,7 @@ export default function BlogPost() {
   useEffect(() => {
     async function fetchPost() {
       if (!slug) return;
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("blog_posts")
         .select("id, slug, title, excerpt, content, category, read_time, published_at, updated_at, image_url, meta_description")
         .eq("slug", slug)
@@ -55,7 +56,7 @@ export default function BlogPost() {
       if (!error && data) {
         setPost(data as BlogPost);
 
-        const { data: relData } = await supabase
+        const { data: relData } = await db
           .from("blog_posts")
           .select("id, slug, title, category, read_time, published_at")
           .eq("category", data.category)
@@ -66,7 +67,7 @@ export default function BlogPost() {
         if (relData && relData.length > 0) {
           setRelated(relData as RelatedPost[]);
         } else {
-          const { data: anyRel } = await supabase
+          const { data: anyRel } = await db
             .from("blog_posts")
             .select("id, slug, title, category, read_time, published_at")
             .neq("slug", slug)
@@ -84,16 +85,11 @@ export default function BlogPost() {
   useEffect(() => {
     if (post && !viewTracked.current) {
       viewTracked.current = true;
-      supabase.from("analytics_events").insert({
-        event_type: "blog_view",
-        metadata: {
-          blog_post_id: post.id,
-          blog_slug: post.slug,
-          blog_category: post.category,
-          blog_title: post.title,
-        },
-      }).then(({ error }) => {
-        if (error) console.warn("Analytics view tracking failed:", error.message);
+      track("blog_view", {
+        blog_post_id: post.id,
+        blog_slug: post.slug,
+        blog_category: post.category,
+        blog_title: post.title,
       });
     }
   }, [post]);
@@ -101,16 +97,11 @@ export default function BlogPost() {
   const handleBlogCtaClick = () => {
     if (post) {
       // Track CTA click
-      supabase.from("analytics_events").insert({
-        event_type: "blog_cta_click",
-        metadata: {
-          blog_post_id: post.id,
-          blog_slug: post.slug,
-          blog_category: post.category,
-          blog_title: post.title,
-        },
-      }).then(({ error }) => {
-        if (error) console.warn("Analytics CTA tracking failed:", error.message);
+      track("blog_cta_click", {
+        blog_post_id: post.id,
+        blog_slug: post.slug,
+        blog_category: post.category,
+        blog_title: post.title,
       });
       // Store referral so ApplyModal can tag the application
       try {

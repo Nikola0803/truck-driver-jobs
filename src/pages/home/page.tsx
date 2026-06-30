@@ -84,8 +84,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text">
       <SeoHead
-        title="High-Paying CDL Trucking Jobs Across America - Apply in 30 Seconds"
-        description="Find vetted, high-paying CDL Class A trucking jobs across all 48 contiguous states. Company drivers, owner-operators, and teams welcome. No resume needed. Apply in 30 seconds. 72-hour recruiter callback guarantee."
+        title="CDL Trucking Jobs Across America"
+        description="Find vetted, high-paying CDL Class A trucking jobs across all 48 states. No resume needed — apply in 30 seconds. 72-hour recruiter callback guaranteed."
         keywords="CDL jobs, trucking jobs, truck driver jobs, Class A CDL, OTR jobs, owner-operator jobs, trucking careers, driver recruiting"
         canonicalUrl={SITE_URL}
         jsonLd={[
@@ -103,7 +103,11 @@ export default function Home() {
               "areaServed": "US",
               "availableLanguage": ["English", "Spanish", "Serbian", "Croatian", "Bosnian"]
             },
-            "areaServed": { "@type": "Country", "name": "United States" }
+            "areaServed": { "@type": "Country", "name": "United States" },
+            "sameAs": [
+              "https://www.facebook.com/profile.php?id=61591200320360",
+              "https://www.instagram.com/truckdriverjobsco/"
+            ]
           },
           {
             "@context": "https://schema.org",

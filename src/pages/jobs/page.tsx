@@ -161,8 +161,8 @@ export default function JobsList() {
   return (
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text">
       <SeoHead
-        title="All CDL Trucking Jobs - Browse 450+ Vetted Positions"
-        description="Browse our complete directory of vetted CDL Class A trucking jobs. Filter by equipment type, route type, experience level, and home time. Company drivers, owner-operators, and teams. Apply in 30 seconds."
+        title={`CDL Jobs — ${allJobs.length}+ Open Positions`}
+        description="Browse our complete directory of vetted CDL Class A trucking jobs. Filter by equipment, route type, and home time. Apply in 30 seconds."
         keywords="CDL jobs directory, trucking jobs list, Class A CDL openings, OTR positions, regional trucking jobs, dedicated route jobs"
         canonicalUrl={`${SITE_URL}/jobs`}
         jsonLd={{

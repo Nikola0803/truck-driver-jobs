@@ -156,7 +156,7 @@ export default function ForFleets() {
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text">
       <SeoHead
         title="Hire CDL Drivers: We Fill Your Seats in 72 Hours | For Fleets & Carriers"
-        description="Join 450+ vetted carriers who rely on our 12,000+ driver network. We hand-match qualified CDL Class A candidates to your lanes, equipment, and culture. No upfront fees. Pay only when drivers stay 30 days."
+        description="Hire vetted CDL Class A drivers fast. We hand-match qualified candidates to your lanes and equipment. No upfront fees — pay only when drivers stay 30 days."
         keywords="hire CDL drivers, fleet recruiting, truck driver hiring, carrier driver sourcing, CDL recruitment, trucking fleet staffing"
         canonicalUrl={`${SITE_URL}/for-fleets`}
         jsonLd={{

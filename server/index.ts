@@ -1481,6 +1481,7 @@ function injectSeoIntoHtml(html: string, patches: {
   description: string;
   canonical: string;
   jsonLd: Record<string, unknown>[];
+  ogImage?: string;
 }): string {
   const esc = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const desc = esc(patches.description.slice(0, 160));
@@ -1489,6 +1490,10 @@ function injectSeoIntoHtml(html: string, patches: {
   const ldScript = patches.jsonLd
     .map((ld) => `<script type="application/ld+json">${JSON.stringify(ld)}</script>`)
     .join("\n");
+  // index.html doesn't ship og:image/twitter:image by default — inject fresh tags rather than regex-replace
+  const imageTags = patches.ogImage
+    ? `<meta property="og:image" content="${esc(patches.ogImage)}" />\n<meta name="twitter:image" content="${esc(patches.ogImage)}" />\n`
+    : "";
 
   return html
     .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
@@ -1499,7 +1504,7 @@ function injectSeoIntoHtml(html: string, patches: {
     .replace(/(<meta property="og:url" content=")[^"]*(")/,          `$1${canonical}$2`)
     .replace(/(<meta name="twitter:title" content=")[^"]*(")/,       `$1${title}$2`)
     .replace(/(<meta name="twitter:description" content=")[^"]*(")/,  `$1${desc}$2`)
-    .replace("</head>", `${ldScript}\n</head>`);
+    .replace("</head>", `${imageTags}${ldScript}\n</head>`);
 }
 
 // ── Slug maps (mirrors src/lib/seoSlugs.ts) ──────────────────────────────
@@ -1550,7 +1555,7 @@ if (existsSync(STATIC_DIR)) {
     const DOMAIN = "https://truckdriverjobs.co";
     const jobSlug = toJobSlug(job.id, job.title ?? "", job.company ?? "");
     const canonical = `${DOMAIN}/jobs/${jobSlug}`;
-    const titleText = `${job.title} at ${job.company} | CDL Trucking Job`;
+    const titleText = `${job.title} at ${job.company}`;
     const descText = [
       `${job.title} at ${job.company} in ${job.location}.`,
       job.route_type ? `${job.route_type} route.` : "",
@@ -1605,14 +1610,14 @@ if (existsSync(STATIC_DIR)) {
         "SELECT COUNT(*) as c FROM jobs WHERE status='active' AND (state = ? OR state = ?)"
       ).get(stateInfo.abbr, stateInfo.name) as any;
       count = row?.c ?? 0;
-      titleText = `CDL Truck Driving Jobs in ${stateInfo.name}`;
+      titleText = `CDL Jobs in ${stateInfo.name} (${new Date().getFullYear()})`;
       descText = `Find ${count} CDL truck driving jobs in ${stateInfo.name} from verified carriers. Dry Van, Flatbed, Reefer and Tanker positions available. Apply in 30 seconds — no resume needed.`;
     } else {
       const row = db.prepare(
         "SELECT COUNT(*) as c FROM jobs WHERE status='active' AND equipment = ?"
       ).get(equipmentLabel) as any;
       count = row?.c ?? 0;
-      titleText = `${equipmentLabel} Truck Driving Jobs`;
+      titleText = `${equipmentLabel} CDL Truck Driving Jobs`;
       descText = `Find ${count} ${equipmentLabel} CDL truck driving jobs across the US from verified carriers. OTR, Regional, and Local routes available. Apply in 30 seconds — no resume needed.`;
     }
 
@@ -1626,6 +1631,66 @@ if (existsSync(STATIC_DIR)) {
     }];
 
     return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
+  });
+
+  // Blog post pages — inject SEO before serving SPA shell
+  app.get("/blog/:slug", (c) => {
+    const slug = c.req.param("slug");
+    let html: string;
+    try {
+      html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8");
+    } catch {
+      return c.text("App not built. Run: npm run build", 503);
+    }
+
+    const post = db.prepare(
+      "SELECT slug, title, excerpt, meta_description, content, category, image_url, published_at, updated_at FROM blog_posts WHERE slug = ? AND status = 'published'"
+    ).get(slug) as any;
+
+    if (!post) return c.html(html); // unknown/unpublished post — serve SPA as-is
+
+    const DOMAIN = "https://truckdriverjobs.co";
+    const canonical = `${DOMAIN}/blog/${post.slug}`;
+    const titleText = post.title;
+    const descText = post.meta_description || post.excerpt || "";
+    const dateModified = post.updated_at || post.published_at;
+
+    const jsonLd: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": DOMAIN },
+          { "@type": "ListItem", "position": 2, "name": "The Dispatch", "item": `${DOMAIN}/blog` },
+          { "@type": "ListItem", "position": 3, "name": post.title },
+        ],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": post.title,
+        "description": descText,
+        "image": post.image_url ?? undefined,
+        "datePublished": post.published_at,
+        "dateModified": dateModified,
+        "author": { "@type": "Organization", "name": "TruckDriverJobs.co Editorial Team", "url": DOMAIN },
+        "publisher": {
+          "@type": "Organization",
+          "name": "TruckDriverJobs.co",
+          "url": DOMAIN,
+          "logo": { "@type": "ImageObject", "url": `${DOMAIN}/vite.svg` },
+        },
+        "mainEntityOfPage": { "@type": "WebPage", "@id": canonical },
+      },
+    ];
+
+    return c.html(injectSeoIntoHtml(html, {
+      title: titleText,
+      description: descText,
+      canonical,
+      jsonLd,
+      ogImage: post.image_url ?? undefined,
+    }));
   });
 
   app.use("/*", serveStatic({ root: "./out" }));

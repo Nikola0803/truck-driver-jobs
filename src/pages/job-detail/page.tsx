@@ -143,7 +143,7 @@ export default function JobDetail() {
   return (
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text">
       <SeoHead
-        title={`${job.title} at ${job.company} | CDL Trucking Job`}
+        title={`${job.title} at ${job.company}`}
         description={`${job.title} at ${job.company} in ${job.location}. ${job.routeType} route, ${job.equipment} equipment, ${job.homeTime} home time. ${job.description.slice(0, 150)}`}
         keywords={`CDL job, trucking job, ${job.equipment}, ${job.routeType}, ${job.location}, Class A CDL, ${job.company}`}
         canonicalUrl={`${SITE_URL}/jobs/${job.slug}`}

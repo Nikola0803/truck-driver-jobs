@@ -23,9 +23,16 @@ export default function SeoHead({
   ogType = "website",
   jsonLd,
 }: SeoHeadProps) {
-  const fullTitle = `${title} | TruckDriverJobs.co`;
+  // Google truncates titles around ~60 chars in search results. Only append
+  // the brand suffix when there's room — long dynamic titles (job postings,
+  // specific equipment pages) are already descriptive enough on their own.
+  const BRAND_SUFFIX = " | TruckDriverJobs.co";
+  const fullTitle = title.length + BRAND_SUFFIX.length <= 60 ? `${title}${BRAND_SUFFIX}` : title;
+  // Google truncates meta descriptions around ~155-160 chars. Trim with an
+  // ellipsis rather than letting the SERP snippet cut off mid-word.
+  const safeDescription = description.length > 160 ? `${description.slice(0, 157).trimEnd()}…` : description;
   const ogTitleFinal = ogTitle ?? fullTitle;
-  const ogDescriptionFinal = ogDescription ?? description;
+  const ogDescriptionFinal = ogDescription ?? safeDescription;
   const resolvedCanonical = canonicalUrl ?? SITE_URL;
   const jsonLdArray = jsonLd
     ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd])
@@ -34,7 +41,7 @@ export default function SeoHead({
   return (
     <>
       <title>{fullTitle}</title>
-      <meta name="description" content={description} />
+      <meta name="description" content={safeDescription} />
       {keywords && <meta name="keywords" content={keywords} />}
       <link rel="canonical" href={resolvedCanonical} />
 

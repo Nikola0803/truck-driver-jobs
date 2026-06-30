@@ -55,8 +55,8 @@ export default function CdlJobsPage() {
   const isState = resolved.type === "state";
   const label = isState ? resolved.state.name : resolved.equipment.label;
   const pageTitle = isState
-    ? `CDL Truck Driving Jobs in ${label} (${new Date().getFullYear()})`
-    : `${label} Truck Driving Jobs | CDL-A Positions`;
+    ? `CDL Jobs in ${label} (${new Date().getFullYear()})`
+    : `${label} CDL Truck Driving Jobs`;
   const metaDesc = isState
     ? `Find CDL-A truck driving jobs in ${label}. Browse ${jobs.length || "active"} verified positions from top carriers. No resume needed — apply in 30 seconds and get a recruiter callback within 72 hours.`
     : `Find ${label} CDL-A truck driving jobs across the US. Browse ${jobs.length || "active"} verified ${label} positions with top carriers. Apply in 30 seconds — no resume needed.`;

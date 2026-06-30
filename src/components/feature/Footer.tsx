@@ -54,14 +54,11 @@ export default function Footer() {
                 1200 Commerce St, Dallas, TX 75202
               </li>
               <li className="mt-3 flex gap-3">
-                <a href="#" className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-border text-brand-text transition-colors hover:bg-brand-orange hover:text-white">
+                <a href="https://www.facebook.com/profile.php?id=61591200320360" target="_blank" rel="noopener noreferrer" aria-label="TruckDriverJobs.co on Facebook" className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-border text-brand-text transition-colors hover:bg-brand-orange hover:text-white">
                   <i className="ri-facebook-fill" />
                 </a>
-                <a href="#" className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-border text-brand-text transition-colors hover:bg-brand-orange hover:text-white">
+                <a href="https://www.instagram.com/truckdriverjobsco/" target="_blank" rel="noopener noreferrer" aria-label="TruckDriverJobs.co on Instagram" className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-border text-brand-text transition-colors hover:bg-brand-orange hover:text-white">
                   <i className="ri-instagram-line" />
-                </a>
-                <a href="#" className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-border text-brand-text transition-colors hover:bg-brand-orange hover:text-white">
-                  <i className="ri-linkedin-fill" />
                 </a>
               </li>
             </ul>

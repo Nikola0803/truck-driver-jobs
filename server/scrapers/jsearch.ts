@@ -1,6 +1,6 @@
 import type { ScrapedJob } from "./types.js";
 
-const BASE = "https://jsearch.p.rapidapi.com/search";
+const BASE = "https://jsearch.p.rapidapi.com/search-v2";
 
 interface JSearchJob {
   job_id: string;
@@ -96,7 +96,6 @@ export async function fetchJSearchJobs(rapidApiKey: string): Promise<ScrapedJob[
     try {
       const url = new URL(BASE);
       url.searchParams.set("query", query);
-      url.searchParams.set("page", "1");
       url.searchParams.set("num_pages", "1"); // 10 results per call — 8 queries = 8 API calls/run
       url.searchParams.set("country", "us");
       url.searchParams.set("date_posted", "month");
@@ -117,14 +116,15 @@ export async function fetchJSearchJobs(rapidApiKey: string): Promise<ScrapedJob[
         continue;
       }
 
-      const data = (await res.json()) as { data?: JSearchJob[]; status?: string; error?: string };
+      const data = (await res.json()) as { data?: { jobs?: JSearchJob[] }; status?: string; error?: { message?: string } | string };
       if (data.status === "ERROR" || data.error) {
         console.warn(`[JSearch] API error on "${query}":`, data.error ?? data.status);
         continue;
       }
-      console.log(`[JSearch] "${query}" → ${data.data?.length ?? 0} results`);
+      const jobs = data.data?.jobs ?? [];
+      console.log(`[JSearch] "${query}" → ${jobs.length} results`);
 
-      for (const job of data.data ?? []) {
+      for (const job of jobs) {
         if (!job.job_id) continue;
         if (seen.has(job.job_id)) continue;
         seen.add(job.job_id);

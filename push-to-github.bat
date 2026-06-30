@@ -51,7 +51,8 @@ if %errorlevel% == 0 (
     echo    SUCCESS - code is on GitHub!
     echo  ============================================
     echo.
-    echo  Next: SSH into your VPS and run setup-vps.sh
+    echo  Deploying via GitHub Actions automatically...
+    echo  Check progress: github.com/Nikola0803/truck-driver-jobs/actions
 ) else (
     echo  ============================================
     echo    Error - check output above.

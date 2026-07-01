@@ -69,16 +69,46 @@ app.post("/api/auth/register", async (c) => {
 
   const id = randomUUID();
   const password_hash = await bcrypt.hash(body.password, 10);
-  db.prepare("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)").run(id, body.email.toLowerCase(), password_hash);
 
-  // Insert profile
-  const profile = { id, is_admin: 0, has_cdl: body.has_cdl !== false ? 1 : 0 };
-  const profileFields = ["id", "full_name", "phone", "has_cdl", "cdl_state", "experience", "endorsement_type", "driver_type", "preferred_route", "preferred_equipment", "home_time_preference", "min_pay_expectation"];
-  const profileData: Record<string, any> = { ...profile };
-  for (const f of profileFields) { if (f !== "id" && body[f] !== undefined) profileData[f] = body[f]; }
-  const cols = Object.keys(profileData).join(", ");
-  const placeholders = Object.keys(profileData).map(() => "?").join(", ");
-  db.prepare(`INSERT INTO profiles (${cols}) VALUES (${placeholders})`).run(...Object.values(profileData));
+  try {
+    db.prepare("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)").run(id, body.email.toLowerCase(), password_hash);
+  } catch (e: any) {
+    return c.json({ message: "Failed to create account: " + (e?.message ?? "unknown error") }, 500);
+  }
+
+  // SQLite only accepts null | number | bigint | string | Buffer — convert everything else
+  const toSqlite = (v: unknown): null | number | string => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "boolean") return v ? 1 : 0;
+    if (typeof v === "number" || typeof v === "string") return v;
+    return String(v);
+  };
+
+  try {
+    db.prepare(`
+      INSERT INTO profiles
+        (id, is_admin, has_cdl, full_name, phone, cdl_state, experience,
+         endorsement_type, driver_type, preferred_route, preferred_equipment,
+         home_time_preference, min_pay_expectation)
+      VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      toSqlite(body.has_cdl !== false ? 1 : 0),
+      toSqlite(body.full_name ?? null),
+      toSqlite(body.phone ?? null),
+      toSqlite(body.cdl_state ?? null),
+      toSqlite(body.experience ?? null),
+      toSqlite(body.endorsement_type ?? null),
+      toSqlite(body.driver_type ?? "company_driver"),
+      toSqlite(body.preferred_route ?? null),
+      toSqlite(body.preferred_equipment ?? null),
+      toSqlite(body.home_time_preference ?? null),
+      toSqlite(body.min_pay_expectation ?? null),
+    );
+  } catch (e: any) {
+    // Profile insert failed — still return success since user account was created
+    console.error("[register] Profile insert failed:", e?.message);
+  }
 
   const token = signToken({ sub: id, email: body.email, is_admin: false });
   const user = { id, email: body.email, created_at: new Date().toISOString(), is_admin: false };

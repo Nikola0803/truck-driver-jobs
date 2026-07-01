@@ -1460,6 +1460,151 @@ registerScheduledTask({
   },
 });
 
+// ── Job expiry — runs at 09:00 UTC, after all scrapers finish ────────────────
+// Marks aggregated jobs as inactive if they haven't been re-scraped in 45 days.
+// This prevents stale listings from accumulating forever.
+registerScheduledTask({
+  name: "Job expiry cleanup",
+  hourUTC: 9,
+  minuteUTC: 0,
+  fn: async () => {
+    const cutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    const result = db.prepare(
+      `UPDATE jobs SET status = 'inactive', updated_at = datetime('now')
+       WHERE is_aggregated = 1 AND status = 'active'
+       AND (scraped_at IS NULL OR scraped_at < ?)`
+    ).run(cutoff);
+    console.log(`[Expiry] Marked ${result.changes} stale aggregated jobs as inactive`);
+  },
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// AI BLOG GENERATION
+// POST /api/admin/blog/generate — generate a full SEO blog post via Claude Haiku
+// ────────────────────────────────────────────────────────────────────────
+app.post("/api/admin/blog/generate", async (c) => {
+  const denied = requireAdmin(c);
+  if (denied) return denied;
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return c.json({ message: "ANTHROPIC_API_KEY not set in .env" }, 500);
+
+  const { topic, category = "Career Tips" } = await c.req.json().catch(() => ({}));
+  if (!topic) return c.json({ message: "topic is required" }, 400);
+
+  const prompt = `You are an SEO content expert writing for TruckDriverJobs.co, a CDL job board.
+
+Write a comprehensive, SEO-optimized blog post about: "${topic}"
+
+Return ONLY valid JSON with this exact structure (no markdown, no code blocks, just JSON):
+{
+  "title": "Engaging title with primary keyword near the start (60 chars max)",
+  "slug": "url-friendly-slug-with-hyphens",
+  "meta_description": "Compelling meta description 150-160 chars, includes primary keyword",
+  "excerpt": "2-3 sentence summary for blog listing pages",
+  "category": "${category}",
+  "read_time": "X min read",
+  "content": "Full markdown content here"
+}
+
+SEO content rules:
+- 1200-1800 words total
+- H2 headings every 200-300 words
+- Include a "Frequently Asked Questions" H2 section at the end with 3-4 Q&A pairs using H3 for questions (Google featured snippets)
+- Use the primary keyword naturally in the first paragraph, at least one H2, and the conclusion
+- Write for truck drivers — practical, direct, no fluff
+- Include specific numbers, facts, and actionable advice
+- No keyword stuffing
+- Markdown formatting: **bold** for emphasis, bullet lists where appropriate`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return c.json({ message: `Anthropic API error: ${res.status} — ${err.slice(0, 300)}` }, 500);
+    }
+
+    const data = await res.json() as any;
+    const raw = data.content?.[0]?.text ?? "";
+
+    // Strip code fences if model wrapped in them
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+
+    let post: any;
+    try {
+      post = JSON.parse(cleaned);
+    } catch {
+      return c.json({ message: "Model returned invalid JSON", raw: raw.slice(0, 500) }, 500);
+    }
+
+    // Ensure slug is clean
+    post.slug = (post.slug ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    post.published_at = new Date().toISOString().split("T")[0];
+    post.status = "published";
+    post.featured = 0;
+
+    return c.json({ post });
+  } catch (e: any) {
+    return c.json({ message: e?.message ?? "Generation failed" }, 500);
+  }
+});
+
+/** POST /api/admin/blog/save-generated — save an AI-generated post to the DB */
+app.post("/api/admin/blog/save-generated", async (c) => {
+  const denied = requireAdmin(c);
+  if (denied) return denied;
+
+  const post = await c.req.json().catch(() => null);
+  if (!post?.slug || !post?.title || !post?.content) {
+    return c.json({ message: "slug, title, and content are required" }, 400);
+  }
+
+  // Check slug collision
+  const existing = db.prepare("SELECT id FROM blog_posts WHERE slug = ?").get(post.slug) as any;
+  if (existing) {
+    post.slug = `${post.slug}-${Date.now()}`;
+  }
+
+  db.prepare(`
+    INSERT INTO blog_posts
+      (slug, title, content, excerpt, meta_description, category, read_time, published_at, featured, status)
+    VALUES
+      (@slug, @title, @content, @excerpt, @meta_description, @category, @read_time, @published_at, @featured, @status)
+  `).run({
+    slug: post.slug,
+    title: post.title,
+    content: post.content,
+    excerpt: post.excerpt ?? null,
+    meta_description: post.meta_description ?? null,
+    category: post.category ?? "Career Tips",
+    read_time: post.read_time ?? "5 min read",
+    published_at: post.published_at ?? new Date().toISOString().split("T")[0],
+    featured: post.featured ? 1 : 0,
+    status: "published",
+  });
+
+  return c.json({ ok: true, slug: post.slug });
+});
+
 // ── Static file serving (production only — Vite handles this in dev) ────────
 // Serves the built React app from out/ and falls back to index.html for SPA routing
 const STATIC_DIR = resolve(process.cwd(), "out");

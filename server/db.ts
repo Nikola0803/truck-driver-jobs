@@ -237,6 +237,17 @@ const migrations = [
   `ALTER TABLE applications ADD COLUMN consent_given INTEGER DEFAULT 0`,
   `ALTER TABLE blog_posts ADD COLUMN featured INTEGER DEFAULT 0`,
   `ALTER TABLE blog_posts ADD COLUMN meta_description TEXT`,
+  // Profile columns — may be missing in older production databases
+  `ALTER TABLE profiles ADD COLUMN is_admin INTEGER DEFAULT 0`,
+  `ALTER TABLE profiles ADD COLUMN driver_type TEXT`,
+  `ALTER TABLE profiles ADD COLUMN has_cdl INTEGER DEFAULT 1`,
+  `ALTER TABLE profiles ADD COLUMN cdl_state TEXT`,
+  `ALTER TABLE profiles ADD COLUMN experience TEXT`,
+  `ALTER TABLE profiles ADD COLUMN endorsement_type TEXT`,
+  `ALTER TABLE profiles ADD COLUMN preferred_route TEXT`,
+  `ALTER TABLE profiles ADD COLUMN preferred_equipment TEXT`,
+  `ALTER TABLE profiles ADD COLUMN home_time_preference TEXT`,
+  `ALTER TABLE profiles ADD COLUMN min_pay_expectation TEXT`,
 ];
 
 for (const sql of migrations) {

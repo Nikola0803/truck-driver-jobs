@@ -16,6 +16,7 @@ const SITE_ITEMS = [
   { to: "/admin/scraper", label: "Aggregator", icon: "ri-download-cloud-line" },
   { to: "/admin/blog", label: "Blog Posts", icon: "ri-article-line" },
   { to: "/admin/seo", label: "SEO Pages", icon: "ri-search-line" },
+  { to: "/admin/users", label: "Users", icon: "ri-shield-user-line" },
 ];
 
 export default function AdminSidebar() {

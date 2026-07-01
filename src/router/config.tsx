@@ -27,6 +27,7 @@ import ScraperPage from "../pages/admin/scraper/page";
 import PrivacyPolicy from "../pages/privacy/page";
 import MatchPage from "../pages/match/page";
 import AdminLeads from "../pages/admin/leads/page";
+import AdminUsers from "../pages/admin/users/page";
 import CdlJobsPage from "../pages/cdl-jobs/page";
 
 const routes: RouteObject[] = [
@@ -82,6 +83,7 @@ const routes: RouteObject[] = [
       { path: "seo", element: <SeoPages /> },
       { path: "scraper", element: <ScraperPage /> },
       { path: "leads", element: <AdminLeads /> },
+      { path: "users", element: <AdminUsers /> },
     ],
   },
   {

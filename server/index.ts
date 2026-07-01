@@ -64,7 +64,7 @@ app.post("/api/auth/register", async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body?.email || !body?.password) return c.json({ message: "email and password required" }, 400);
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(body.email);
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(body.email.toLowerCase().trim());
   if (existing) return c.json({ message: "Email already registered" }, 409);
 
   const id = randomUUID();
@@ -1164,6 +1164,72 @@ async function generateMatchReasons(matches: any[], profile: any): Promise<strin
     return templates;
   }
 }
+
+// ── Admin: User Management ───────────────────────────────────────────────────
+
+/** GET /api/admin/users — list all registered users with their role */
+app.get("/api/admin/users", (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const rows = db.prepare(`
+    SELECT u.id, u.email, u.created_at,
+           p.full_name, p.phone, p.is_admin, p.has_cdl,
+           p.cdl_state, p.experience, p.driver_type,
+           p.preferred_route, p.preferred_equipment
+    FROM users u
+    LEFT JOIN profiles p ON p.id = u.id
+    ORDER BY u.created_at DESC
+    LIMIT 500
+  `).all() as any[];
+  return c.json(rows.map((r) => ({
+    ...r,
+    is_admin: r.is_admin === 1 || r.is_admin === true,
+    has_cdl: r.has_cdl === 1 || r.has_cdl === true,
+  })));
+});
+
+/** POST /api/admin/users — create a user manually */
+app.post("/api/admin/users", async (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const body = await c.req.json().catch(() => null);
+  if (!body?.email || !body?.password) return c.json({ message: "email and password required" }, 400);
+
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(body.email.toLowerCase().trim());
+  if (existing) return c.json({ message: "Email already registered" }, 409);
+
+  const id = randomUUID();
+  const password_hash = await bcrypt.hash(body.password, 10);
+  db.prepare("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)").run(id, body.email.toLowerCase().trim(), password_hash);
+  db.prepare(`
+    INSERT INTO profiles (id, is_admin, has_cdl, full_name, phone, driver_type)
+    VALUES (?, ?, 1, ?, ?, 'company_driver')
+  `).run(id, body.is_admin ? 1 : 0, body.full_name ?? null, body.phone ?? null);
+
+  return c.json({ ok: true, id, email: body.email.toLowerCase() });
+});
+
+/** PATCH /api/admin/users/:id/role — update a user's admin status */
+app.patch("/api/admin/users/:id/role", (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const userId = c.req.param("id");
+  const body = c.req.json() as any;
+  return body.then((b: any) => {
+    const isAdmin = b.is_admin ? 1 : 0;
+    db.prepare("UPDATE profiles SET is_admin = ?, updated_at = datetime('now') WHERE id = ?").run(isAdmin, userId);
+    return c.json({ ok: true });
+  });
+});
+
+/** DELETE /api/admin/users/:id — delete a user account */
+app.delete("/api/admin/users/:id", (c) => {
+  const denied = requireAdmin(c); if (denied) return denied;
+  const userId = c.req.param("id");
+  // Don't allow deleting yourself
+  const token = extractToken(c);
+  const payload = token ? verifyToken(token) : null;
+  if (payload?.sub === userId) return c.json({ message: "Cannot delete your own account" }, 400);
+  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  return c.json({ ok: true });
+});
 
 /** GET /api/admin/leads — list all leads (admin only) */
 app.get("/api/admin/leads", (c) => {

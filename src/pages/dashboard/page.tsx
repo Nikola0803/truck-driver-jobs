@@ -6,6 +6,20 @@ import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import SeoHead from "@/components/feature/SeoHead";
 import { jobs } from "@/mocks/jobs";
+import { toJobSlug } from "@/lib/jobSlug";
+
+interface RecommendedJob {
+  id: number;
+  title: string;
+  company: string;
+  location: string;
+  route_type: string | null;
+  equipment: string | null;
+  pay_rate: string | null;
+  pay_period: string | null;
+  home_time: string | null;
+  match_score: number;
+}
 
 interface SavedJob {
   id: number;
@@ -38,11 +52,73 @@ const statusLabels: Record<string, string> = {
   rejected: "Not Selected",
 };
 
+function JobAlertBanner({ profile }: { profile: any }) {
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem("alert_banner_dismissed"));
+
+  if (dismissed || subscribed) return null;
+
+  const handleSubscribe = async () => {
+    const email = prompt("Enter your email for job alerts:");
+    if (!email || !email.includes("@")) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/job-alerts/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          route_type: profile?.preferred_route ?? null,
+          equipment: profile?.preferred_equipment ?? null,
+          state: profile?.cdl_state ?? null,
+        }),
+      });
+      if (res.ok) setSubscribed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 flex flex-col gap-3 rounded-xl border border-brand-orange/30 bg-brand-orange-light/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-orange-light">
+          <i className="ri-notification-3-line text-brand-orange" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-foreground-950">Get job alerts matching your profile</p>
+          <p className="text-xs text-foreground-500">
+            Daily email when new {profile?.preferred_route || "CDL"} {profile?.preferred_equipment ? `· ${profile.preferred_equipment}` : ""} jobs are posted
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handleSubscribe}
+          disabled={loading}
+          className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-orange-hover disabled:opacity-50"
+        >
+          {loading ? "Subscribing..." : "Subscribe"}
+        </button>
+        <button
+          onClick={() => { setDismissed(true); localStorage.setItem("alert_banner_dismissed", "1"); }}
+          className="text-foreground-400 hover:text-foreground-700"
+          title="Dismiss"
+        >
+          <i className="ri-close-line" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "saved" | "applications">("overview");
 
@@ -56,12 +132,15 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [savedRes, appsRes] = await Promise.all([
+    const token = localStorage.getItem("tdj_token") ?? "";
+    const [savedRes, appsRes, recsRes] = await Promise.all([
       db.from("saved_jobs").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
       db.from("applications").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
+      fetch("/api/jobs/recommendations", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.ok ? r.json() : []),
     ]);
     setSavedJobs(savedRes.data ?? []);
     setApplications(appsRes.data ?? []);
+    setRecommendations(recsRes ?? []);
     setLoading(false);
   };
 
@@ -152,6 +231,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Job Alert Subscribe Banner */}
+        <JobAlertBanner profile={profile} />
 
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-xl border border-brand-border bg-brand-surface p-1 w-fit">
@@ -293,6 +375,49 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
+
+                {/* Recommended for You */}
+                {recommendations.length > 0 && (
+                  <div className="rounded-xl border border-brand-border bg-brand-surface p-6 lg:col-span-3">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <i className="ri-sparkling-line text-brand-orange" />
+                        <h3 className="font-heading text-lg font-bold text-brand-text">Recommended for You</h3>
+                        <span className="rounded-full bg-brand-orange-light px-2 py-0.5 text-[10px] font-bold text-brand-orange">Based on your profile</span>
+                      </div>
+                      <Link to="/jobs" className="text-sm font-semibold text-brand-orange hover:underline">See All Jobs</Link>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {recommendations.map((job) => {
+                        const slug = toJobSlug(job.id, job.title, job.company);
+                        const pay = job.pay_rate ? `${job.pay_rate}${job.pay_period ? "/" + job.pay_period : ""}` : null;
+                        return (
+                          <Link
+                            key={job.id}
+                            to={`/jobs/${slug}`}
+                            className="group flex flex-col gap-2 rounded-lg border border-brand-border bg-brand-bg p-4 transition-all hover:border-brand-orange hover:shadow-sm"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-orange-light">
+                                <i className="ri-truck-line text-brand-orange" />
+                              </div>
+                              {pay && <span className="text-xs font-bold text-green-600">{pay}</span>}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-brand-text group-hover:text-brand-orange transition-colors line-clamp-2">{job.title}</p>
+                              <p className="text-xs text-brand-text-secondary mt-0.5">{job.company} · {job.location}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-auto pt-1">
+                              {job.route_type && <span className="rounded-full border border-brand-border bg-brand-surface px-2 py-0.5 text-[10px] font-medium text-brand-text-secondary">{job.route_type}</span>}
+                              {job.equipment && <span className="rounded-full border border-brand-border bg-brand-surface px-2 py-0.5 text-[10px] font-medium text-brand-text-secondary">{job.equipment}</span>}
+                              {job.home_time && <span className="rounded-full border border-brand-border bg-brand-surface px-2 py-0.5 text-[10px] font-medium text-brand-text-secondary">{job.home_time}</span>}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Recent Applications */}
                 <div className="rounded-xl border border-brand-border bg-brand-surface p-6 lg:col-span-3">

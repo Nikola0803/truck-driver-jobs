@@ -74,6 +74,32 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: 'out',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor: React ecosystem
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) {
+            return "vendor-react";
+          }
+          // Vendor: i18n (large — ~200KB)
+          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+            return "vendor-i18n";
+          }
+          // Admin panel — only loaded by admin users
+          if (id.includes("/pages/admin/")) {
+            return "chunk-admin";
+          }
+          // Blog pages — only loaded on blog routes
+          if (id.includes("/pages/blog")) {
+            return "chunk-blog";
+          }
+          // Other large vendor libs
+          if (id.includes("node_modules/")) {
+            return "vendor-misc";
+          }
+        },
+      },
+    },
   },
   resolve: {
     alias: {

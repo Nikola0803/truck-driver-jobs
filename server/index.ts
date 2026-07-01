@@ -139,6 +139,54 @@ app.get("/api/auth/me", (c) => {
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Job Recommendations: personalized job matches based on driver profile
+// GET /api/jobs/recommendations — requires auth, uses profile prefs
+// ────────────────────────────────────────────────────────────────────────
+app.get("/api/jobs/recommendations", (c) => {
+  const denied = requireAuth(c); if (denied) return denied;
+  const u = (c as any).user;
+
+  const profile = db.prepare(
+    "SELECT preferred_route, preferred_equipment, cdl_state, state, home_time_preference FROM profiles WHERE id = ?"
+  ).get(u.sub) as any;
+
+  if (!profile) return c.json([]);
+
+  // Build a scored query: primary match on route+equipment, secondary on state
+  const conditions: string[] = ["status = 'active'"];
+  const params: any[] = [];
+
+  const route     = profile.preferred_route;
+  const equipment = profile.preferred_equipment;
+  const state     = profile.cdl_state ?? profile.state;
+
+  // Build a CASE score so most-relevant jobs float to top
+  const scoreParts: string[] = [];
+  if (route)     { scoreParts.push("CASE WHEN route_type = ? THEN 3 ELSE 0 END"); params.push(route); }
+  if (equipment) { scoreParts.push("CASE WHEN equipment = ? THEN 2 ELSE 0 END"); params.push(equipment); }
+  if (state)     { scoreParts.push("CASE WHEN state = ? THEN 1 ELSE 0 END"); params.push(state); }
+
+  const scoreExpr = scoreParts.length > 0
+    ? `(${scoreParts.join(" + ")}) AS match_score`
+    : "0 AS match_score";
+
+  // Must match at least one preference (score > 0) unless profile is bare
+  const having = scoreParts.length > 0 ? "HAVING match_score > 0" : "";
+
+  const jobs = db.prepare(
+    `SELECT id, title, company, location, city, state, route_type, equipment, home_time, pay_rate, pay_period, created_at, ${scoreExpr}
+     FROM jobs
+     WHERE ${conditions.join(" AND ")}
+     GROUP BY id
+     ${having}
+     ORDER BY match_score DESC, created_at DESC
+     LIMIT 6`
+  ).all(...params) as any[];
+
+  return c.json(jobs);
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // RPC: AI content generation
 // ────────────────────────────────────────────────────────────────────────
 app.post("/api/rpc/generate-content", async (c) => {
@@ -1351,9 +1399,11 @@ function upsertJobs(jobs: ScrapedJob[]): { inserted: number; updated: number } {
   let inserted = 0, updated = 0;
   const now = new Date().toISOString();
   for (const job of jobs) {
+    // Dedup by title + company + location so same job posted in different cities isn't collapsed
+    const normalizedLocation = (job.location ?? "").toLowerCase().trim();
     const existing = db.prepare(
-      "SELECT id FROM jobs WHERE title = ? AND company = ? LIMIT 1"
-    ).get(job.title, job.company) as any;
+      "SELECT id FROM jobs WHERE title = ? AND company = ? AND LOWER(TRIM(location)) = ? LIMIT 1"
+    ).get(job.title, job.company, normalizedLocation) as any;
     const row = {
       title: job.title,
       company: job.company,
@@ -1575,6 +1625,136 @@ registerScheduledTask({
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// JOB ALERTS
+// POST /api/job-alerts/subscribe  — subscribe (unauthenticated)
+// DELETE /api/job-alerts/unsubscribe?email=X&token=X — unsubscribe
+// Nightly matching runs at 09:30 UTC
+// ────────────────────────────────────────────────────────────────────────
+
+app.post("/api/job-alerts/subscribe", async (c) => {
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ message: "Invalid JSON" }, 400); }
+
+  const email = (body.email ?? "").toLowerCase().trim();
+  if (!email || !email.includes("@")) return c.json({ message: "Valid email required" }, 400);
+
+  const route_type   = body.route_type   ?? null;
+  const equipment    = body.equipment    ?? null;
+  const state        = body.state        ?? null;
+  const home_time    = body.home_time    ?? null;
+  const min_pay      = body.min_pay      ?? null;
+
+  try {
+    db.prepare(`
+      INSERT INTO job_alerts (email, route_type, equipment, state, home_time, min_pay)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(email, route_type, equipment, state) DO UPDATE SET
+        home_time = excluded.home_time,
+        min_pay   = excluded.min_pay
+    `).run(email, route_type, equipment, state, home_time, min_pay);
+    return c.json({ ok: true, message: "Subscribed! You'll get job alerts matching your preferences." });
+  } catch (e: any) {
+    return c.json({ message: e.message ?? "Failed to subscribe" }, 500);
+  }
+});
+
+app.delete("/api/job-alerts/unsubscribe", (c) => {
+  const email = (c.req.query("email") ?? "").toLowerCase().trim();
+  if (!email) return c.json({ message: "email required" }, 400);
+  db.prepare("DELETE FROM job_alerts WHERE email = ?").run(email);
+  return c.json({ ok: true });
+});
+
+// ── Nightly job alert matching — 09:30 UTC ───────────────────────────────
+registerScheduledTask({
+  name: "Job alerts nightly digest",
+  hourUTC: 9,
+  minuteUTC: 30,
+  fn: async () => {
+    const RESEND_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_KEY) { console.log("[Alerts] No RESEND_API_KEY — skipping"); return; }
+
+    const DOMAIN = "https://truckdriverjobs.co";
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Fetch all active alert subscriptions
+    const alerts = db.prepare("SELECT * FROM job_alerts WHERE confirmed = 1").all() as any[];
+    let sent = 0;
+
+    for (const alert of alerts) {
+      // Build query conditions for this subscriber's preferences
+      const conditions: string[] = ["j.status = 'active'", "j.created_at > ?"];
+      const params: any[] = [cutoff];
+
+      if (alert.route_type) { conditions.push("j.route_type = ?"); params.push(alert.route_type); }
+      if (alert.equipment)  { conditions.push("j.equipment = ?");  params.push(alert.equipment); }
+      if (alert.state)      { conditions.push("j.state = ?");       params.push(alert.state); }
+
+      const jobs = db.prepare(
+        `SELECT id, title, company, location, equipment, route_type, pay_rate, pay_period
+         FROM jobs j WHERE ${conditions.join(" AND ")} ORDER BY j.created_at DESC LIMIT 5`
+      ).all(...params) as any[];
+
+      if (jobs.length === 0) continue;
+
+      // Build email HTML
+      const jobRows = jobs.map((j: any) => {
+        const slug = toJobSlug(j.id, j.title ?? "", j.company ?? "");
+        const pay = j.pay_rate ? `${j.pay_rate}${j.pay_period ? "/" + j.pay_period : ""}` : "";
+        return `
+          <tr>
+            <td style="padding:12px 0;border-bottom:1px solid #e5e7eb;">
+              <a href="${DOMAIN}/jobs/${slug}" style="font-size:15px;font-weight:700;color:#1d4ed8;text-decoration:none;">${j.title}</a><br>
+              <span style="font-size:13px;color:#6b7280;">${j.company} · ${j.location}${pay ? " · <strong>" + pay + "</strong>" : ""}</span>
+            </td>
+          </tr>`;
+      }).join("");
+
+      const filterDesc = [
+        alert.route_type ? `Route: ${alert.route_type}` : "",
+        alert.equipment  ? `Equipment: ${alert.equipment}` : "",
+        alert.state      ? `State: ${alert.state}` : "",
+      ].filter(Boolean).join(" | ") || "All CDL jobs";
+
+      const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+        <h2 style="color:#1d4ed8;">🚛 New CDL Jobs Match Your Alert</h2>
+        <p style="color:#4b5563;font-size:14px;">Filter: <strong>${filterDesc}</strong> — ${jobs.length} new job${jobs.length > 1 ? "s" : ""} posted in the last 24 hours</p>
+        <table width="100%" cellpadding="0" cellspacing="0">${jobRows}</table>
+        <p style="margin-top:24px;">
+          <a href="${DOMAIN}/jobs" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;">View All Jobs</a>
+        </p>
+        <p style="margin-top:32px;font-size:11px;color:#9ca3af;">
+          You're receiving this because you subscribed to job alerts at truckdriverjobs.co.<br>
+          <a href="${DOMAIN}/api/job-alerts/unsubscribe?email=${encodeURIComponent(alert.email)}" style="color:#9ca3af;">Unsubscribe</a>
+        </p>
+      </body></html>`;
+
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: "TruckDriverJobs <alerts@truckdriverjobs.co>",
+            to: [alert.email],
+            subject: `${jobs.length} new CDL job${jobs.length > 1 ? "s" : ""} match your alert`,
+            html,
+          }),
+        });
+        if (res.ok) {
+          sent++;
+          db.prepare("UPDATE job_alerts SET last_sent_at = ? WHERE id = ?")
+            .run(new Date().toISOString(), alert.id);
+        }
+      } catch (e) {
+        console.error("[Alerts] Failed to send to", alert.email, e);
+      }
+    }
+
+    console.log(`[Alerts] Sent ${sent} job alert emails`);
+  },
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // AI BLOG GENERATION
 // POST /api/admin/blog/generate — generate a full SEO blog post via Claude Haiku
 // ────────────────────────────────────────────────────────────────────────
@@ -1714,6 +1894,20 @@ function toJobSlug(id: number, title: string, company: string): string {
   return `${id}-${text}`;
 }
 
+// ── Strip HTML tags for plain-text fields (JSON-LD descriptions etc.) ────
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // ── Server-side SEO injection ─────────────────────────────────────────────
 // Intercepts job detail pages and injects correct title/meta/JSON-LD into
 // the initial HTML so Googlebot sees full SEO data without executing JS.
@@ -1787,13 +1981,24 @@ if (existsSync(STATIC_DIR)) {
       return c.text("App not built. Run: npm run build", 503);
     }
 
+    // Fetch job — including pay and location fields for rich JSON-LD
     const job = isNaN(id) ? null : db.prepare(
-      "SELECT id, title, company, location, route_type, equipment, home_time, description, created_at FROM jobs WHERE id = ? AND status = 'active'"
+      "SELECT id, title, company, location, city, state, route_type, equipment, home_time, description, pay_rate, pay_period, created_at, status FROM jobs WHERE id = ?"
     ).get(id) as any;
+
+    const DOMAIN = "https://truckdriverjobs.co";
 
     if (!job) return c.html(html); // unknown job — serve SPA as-is
 
-    const DOMAIN = "https://truckdriverjobs.co";
+    // 301 redirect expired/inactive jobs to a relevant search instead of a dead page
+    if (job.status !== "active") {
+      const params = new URLSearchParams();
+      if (job.route_type) params.set("route_type", job.route_type);
+      if (job.equipment) params.set("equipment", job.equipment);
+      const qs = params.toString();
+      return c.redirect(`${DOMAIN}/jobs${qs ? "?" + qs : ""}`, 301);
+    }
+
     const jobSlug = toJobSlug(job.id, job.title ?? "", job.company ?? "");
     const canonical = `${DOMAIN}/jobs/${jobSlug}`;
     const titleText = `${job.title} at ${job.company}`;
@@ -1805,23 +2010,58 @@ if (existsSync(STATIC_DIR)) {
       "Apply in 30 seconds — no resume needed.",
     ].filter(Boolean).join(" ");
 
-    const jsonLd: Record<string, unknown>[] = [
-      {
-        "@context": "https://schema.org",
-        "@type": "JobPosting",
-        "title": job.title,
-        "datePosted": (job.created_at ?? new Date().toISOString()).split("T")[0],
-        "description": job.description ?? descText,
-        "employmentType": "FULL_TIME",
-        "hiringOrganization": { "@type": "Organization", "name": job.company },
-        "jobLocation": {
-          "@type": "Place",
-          "address": { "@type": "PostalAddress", "addressLocality": job.location, "addressCountry": "US" }
+    // Plain-text description for JSON-LD (strip HTML tags if present)
+    const plainDesc = job.description ? stripHtml(job.description) : descText;
+
+    // validThrough: 45 days from posting (jobs auto-expire after 45 days)
+    const datePosted = (job.created_at ?? new Date().toISOString()).split("T")[0];
+    const postedMs = job.created_at ? new Date(job.created_at).getTime() : Date.now();
+    const validThrough = new Date(postedMs + 45 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    // Parse city/state — prefer explicit columns, fall back to splitting location string
+    const cityName: string = job.city ?? (job.location?.split(",")[0]?.trim() ?? job.location ?? "");
+    const stateName: string = job.state ?? (job.location?.split(",")[1]?.trim() ?? "US");
+
+    const jsonLdJob: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      "title": job.title,
+      "identifier": { "@type": "PropertyValue", "name": job.company, "value": String(job.id) },
+      "datePosted": datePosted,
+      "validThrough": validThrough,
+      "description": plainDesc,
+      "employmentType": "FULL_TIME",
+      "hiringOrganization": { "@type": "Organization", "name": job.company },
+      "jobLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": cityName,
+          "addressRegion": stateName,
+          "addressCountry": "US",
         },
-        "url": canonical,
-        "directApply": true,
       },
-    ];
+      "url": canonical,
+      "directApply": true,
+    };
+
+    // Add baseSalary if pay rate is available
+    if (job.pay_rate) {
+      const unitText = (() => {
+        const p = (job.pay_period ?? "").toLowerCase();
+        if (p.includes("mile")) return "MILE";
+        if (p.includes("hour")) return "HOUR";
+        if (p.includes("year") || p.includes("annual")) return "YEAR";
+        return "WEEK";
+      })();
+      jsonLdJob["baseSalary"] = {
+        "@type": "MonetaryAmount",
+        "currency": "USD",
+        "value": { "@type": "QuantitativeValue", "value": job.pay_rate, "unitText": unitText },
+      };
+    }
+
+    const jsonLd: Record<string, unknown>[] = [jsonLdJob];
 
     return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
   });

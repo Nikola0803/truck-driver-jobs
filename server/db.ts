@@ -222,6 +222,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_analytics_event_type  ON analytics_events (event_type);
   CREATE INDEX IF NOT EXISTS idx_analytics_session     ON analytics_events (session_id);
   CREATE INDEX IF NOT EXISTS idx_analytics_created_at  ON analytics_events (created_at);
+
+  CREATE TABLE IF NOT EXISTS job_alerts (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    email            TEXT NOT NULL,
+    route_type       TEXT,
+    equipment        TEXT,
+    state            TEXT,
+    home_time        TEXT,
+    min_pay          TEXT,
+    confirmed        INTEGER DEFAULT 1,
+    last_sent_at     TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    UNIQUE(email, route_type, equipment, state)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_job_alerts_email ON job_alerts (email);
 `);
 
 // ── Migrations: add columns that may not exist yet ──────────────────────

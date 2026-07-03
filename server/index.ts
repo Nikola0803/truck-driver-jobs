@@ -1346,9 +1346,17 @@ app.get("/sitemap.xml", (c) => {
     { loc: `${DOMAIN}/cdl-jobs/louisiana`,       priority: "0.8", changefreq: "daily" },
   ];
 
+  // Only index jobs that have a real description (≥200 chars) AND were posted in the last 30 days.
+  // Thin or stale listings dilute crawl budget and trigger "Crawled - currently not indexed".
+  const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const jobs = db.prepare(
-    "SELECT id, title, company, updated_at, created_at FROM jobs WHERE status = 'active' ORDER BY created_at DESC LIMIT 5000"
-  ).all() as { id: number; title: string; company: string; updated_at: string | null; created_at: string }[];
+    `SELECT id, title, company, updated_at, created_at FROM jobs
+     WHERE status = 'active'
+       AND LENGTH(COALESCE(description, '')) >= 200
+       AND created_at >= ?
+     ORDER BY created_at DESC
+     LIMIT 2000`
+  ).all(cutoffDate) as { id: number; title: string; company: string; updated_at: string | null; created_at: string }[];
 
   const posts = db.prepare(
     "SELECT slug, updated_at, published_at FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC"
@@ -1911,26 +1919,29 @@ function stripHtml(html: string): string {
 // ── Server-side SEO injection ─────────────────────────────────────────────
 // Intercepts job detail pages and injects correct title/meta/JSON-LD into
 // the initial HTML so Googlebot sees full SEO data without executing JS.
+// Also injects a crawlable <article> into the body so Googlebot reads real
+// content even before executing JavaScript (fixes "Crawled - not indexed").
 function injectSeoIntoHtml(html: string, patches: {
   title: string;
   description: string;
   canonical: string;
   jsonLd: Record<string, unknown>[];
   ogImage?: string;
+  bodyContent?: string; // raw HTML injected into <body> before the React root
 }): string {
   const esc = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const desc = esc(patches.description.slice(0, 160));
   const title = esc(patches.title);
   const canonical = patches.canonical;
   const ldScript = patches.jsonLd
     .map((ld) => `<script type="application/ld+json">${JSON.stringify(ld)}</script>`)
     .join("\n");
-  // index.html doesn't ship og:image/twitter:image by default — inject fresh tags rather than regex-replace
   const imageTags = patches.ogImage
     ? `<meta property="og:image" content="${esc(patches.ogImage)}" />\n<meta name="twitter:image" content="${esc(patches.ogImage)}" />\n`
     : "";
 
-  return html
+  let result = html
     .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace(/(<meta name="description" content=")[^"]*(")/,  `$1${desc}$2`)
     .replace(/(<link rel="canonical" href=")[^"]*(")/,        `$1${canonical}$2`)
@@ -1940,6 +1951,18 @@ function injectSeoIntoHtml(html: string, patches: {
     .replace(/(<meta name="twitter:title" content=")[^"]*(")/,       `$1${title}$2`)
     .replace(/(<meta name="twitter:description" content=")[^"]*(")/,  `$1${desc}$2`)
     .replace("</head>", `${imageTags}${ldScript}\n</head>`);
+
+  // Inject crawlable body content right after <body> tag.
+  // Styled visually hidden so it doesn't flash before React hydrates,
+  // but fully readable by crawlers (NOT display:none — Google ignores that).
+  if (patches.bodyContent) {
+    result = result.replace(
+      /<body([^>]*)>/,
+      `<body$1><div id="ssr-content" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">${patches.bodyContent}</div>`
+    );
+  }
+
+  return result;
 }
 
 // ── Slug maps (mirrors src/lib/seoSlugs.ts) ──────────────────────────────
@@ -1988,7 +2011,14 @@ if (existsSync(STATIC_DIR)) {
 
     const DOMAIN = "https://truckdriverjobs.co";
 
-    if (!job) return c.html(html); // unknown job — serve SPA as-is
+    // Unknown job ID — return a real 404 so Google doesn't soft-404 flag us
+    if (!job) {
+      return c.html(
+        html.replace(/<title>[^<]*<\/title>/, "<title>Job Not Found | TruckDriverJobs.co</title>")
+            .replace("</head>", `<meta name="robots" content="noindex,follow" />\n</head>`),
+        404
+      );
+    }
 
     // 301 redirect expired/inactive jobs to a relevant search instead of a dead page
     if (job.status !== "active") {
@@ -2063,7 +2093,29 @@ if (existsSync(STATIC_DIR)) {
 
     const jsonLd: Record<string, unknown>[] = [jsonLdJob];
 
-    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
+    // ── Crawlable body block for Googlebot ──────────────────────────────────
+    // Googlebot reads this before executing JS. Fixes "Crawled - currently not
+    // indexed" caused by crawlers seeing an empty SPA shell on first pass.
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const payLine = job.pay_rate
+      ? `<p><strong>Pay:</strong> ${escHtml(job.pay_rate)}${job.pay_period ? " / " + escHtml(job.pay_period) : ""}</p>`
+      : "";
+    const tags = [job.route_type, job.equipment, job.home_time].filter(Boolean).map(escHtml);
+    const bodyContent = `
+      <article>
+        <h1>${escHtml(job.title)} at ${escHtml(job.company)}</h1>
+        <p><strong>Location:</strong> ${escHtml(job.location)}</p>
+        ${payLine}
+        ${tags.length ? `<p>${tags.join(" · ")}</p>` : ""}
+        <section>
+          <h2>Job Description</h2>
+          <p>${escHtml(plainDesc)}</p>
+        </section>
+        <p><strong>Apply:</strong> <a href="${canonical}">Apply now at TruckDriverJobs.co</a></p>
+        <p>Posted: ${datePosted} · Expires: ${validThrough}</p>
+      </article>`;
+
+    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd, bodyContent }));
   });
 
   // Programmatic SEO pages — /cdl-jobs/:slug
@@ -2111,7 +2163,31 @@ if (existsSync(STATIC_DIR)) {
       "numberOfItems": count,
     }];
 
-    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd }));
+    // Fetch top 5 jobs for this page to inject crawlable content
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    let topJobs: any[] = [];
+    if (stateInfo) {
+      topJobs = db.prepare(
+        "SELECT id, title, company, location, pay_rate FROM jobs WHERE status='active' AND (state=? OR state=?) ORDER BY created_at DESC LIMIT 5"
+      ).all(stateInfo.abbr, stateInfo.name) as any[];
+    } else if (equipmentLabel) {
+      topJobs = db.prepare(
+        "SELECT id, title, company, location, pay_rate FROM jobs WHERE status='active' AND equipment=? ORDER BY created_at DESC LIMIT 5"
+      ).all(equipmentLabel) as any[];
+    }
+    const jobListHtml = topJobs.map((j: any) => {
+      const slug = toJobSlug(j.id, j.title ?? "", j.company ?? "");
+      return `<li><a href="https://truckdriverjobs.co/jobs/${slug}">${escHtml(j.title)} at ${escHtml(j.company)} — ${escHtml(j.location)}${j.pay_rate ? " · " + escHtml(j.pay_rate) : ""}</a></li>`;
+    }).join("\n");
+    const cdlBodyContent = `
+      <article>
+        <h1>${escHtml(titleText)}</h1>
+        <p>${escHtml(descText)}</p>
+        ${topJobs.length ? `<h2>Recent Openings</h2><ul>${jobListHtml}</ul>` : ""}
+        <p><a href="https://truckdriverjobs.co/jobs">View all CDL truck driving jobs</a></p>
+      </article>`;
+
+    return c.html(injectSeoIntoHtml(html, { title: titleText, description: descText, canonical, jsonLd, bodyContent: cdlBodyContent }));
   });
 
   // Blog post pages — inject SEO before serving SPA shell
@@ -2128,7 +2204,13 @@ if (existsSync(STATIC_DIR)) {
       "SELECT slug, title, excerpt, meta_description, content, category, image_url, published_at, updated_at FROM blog_posts WHERE slug = ? AND status = 'published'"
     ).get(slug) as any;
 
-    if (!post) return c.html(html); // unknown/unpublished post — serve SPA as-is
+    if (!post) {
+      return c.html(
+        html.replace(/<title>[^<]*<\/title>/, "<title>Post Not Found | TruckDriverJobs.co</title>")
+            .replace("</head>", `<meta name="robots" content="noindex,follow" />\n</head>`),
+        404
+      );
+    }
 
     const DOMAIN = "https://truckdriverjobs.co";
     const canonical = `${DOMAIN}/blog/${post.slug}`;
@@ -2165,12 +2247,25 @@ if (existsSync(STATIC_DIR)) {
       },
     ];
 
+    // Crawlable body block — Googlebot reads this before executing JS
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const plainContent = post.content ? stripHtml(post.content).slice(0, 2000) : (post.excerpt ?? "");
+    const blogBodyContent = `
+      <article>
+        <h1>${escHtml(post.title)}</h1>
+        <p><strong>Category:</strong> ${escHtml(post.category ?? "")}</p>
+        <p><strong>Published:</strong> ${post.published_at ?? ""}</p>
+        ${post.excerpt ? `<p>${escHtml(post.excerpt)}</p>` : ""}
+        <section>${escHtml(plainContent)}</section>
+      </article>`;
+
     return c.html(injectSeoIntoHtml(html, {
       title: titleText,
       description: descText,
       canonical,
       jsonLd,
       ogImage: post.image_url ?? undefined,
+      bodyContent: blogBodyContent,
     }));
   });
 

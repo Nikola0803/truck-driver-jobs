@@ -468,9 +468,9 @@ app.post("/api/quick-apply", async (c) => {
   // Save to applications table
   try {
     db.prepare(`
-      INSERT INTO applications (job_id, status, applicant_name, applicant_email, applicant_phone, consent_given, created_at, updated_at)
-      VALUES (?, 'submitted', ?, ?, ?, 1, ?, ?)
-    `).run(jobId ?? null, fullName, email ?? null, phone, now, now);
+      INSERT INTO applications (job_id, status, applicant_name, applicant_email, applicant_phone, consent_given, created_at)
+      VALUES (?, 'submitted', ?, ?, ?, 1, ?)
+    `).run(jobId ?? null, fullName, email ?? null, phone, now);
   } catch (e) {
     console.error("[QuickApply] DB insert failed:", e);
   }
@@ -1272,7 +1272,7 @@ app.delete("/api/admin/users/:id", (c) => {
   const denied = requireAdmin(c); if (denied) return denied;
   const userId = c.req.param("id");
   // Don't allow deleting yourself
-  const token = extractToken(c);
+  const token = extractToken(c.req.header("authorization"));
   const payload = token ? verifyToken(token) : null;
   if (payload?.sub === userId) return c.json({ message: "Cannot delete your own account" }, 400);
   db.prepare("DELETE FROM users WHERE id = ?").run(userId);

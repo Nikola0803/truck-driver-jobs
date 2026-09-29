@@ -84,8 +84,8 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS applications (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    job_id     INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    user_id    TEXT REFERENCES users(id) ON DELETE CASCADE,
+    job_id     INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
     cdl_class  TEXT,
     experience TEXT,
     message    TEXT,

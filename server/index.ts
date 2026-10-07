@@ -1890,8 +1890,8 @@ app.post("/api/admin/blog/save-generated", async (c) => {
 });
 
 // ── Static file serving (production only — Vite handles this in dev) ────────
-// Serves the built React app from out/ and falls back to index.html for SPA routing
-const STATIC_DIR = resolve(process.cwd(), "out");
+// Serves the built React app from dist/ and falls back to index.html for SPA routing
+const STATIC_DIR = resolve(process.cwd(), "dist");
 
 // ── Job slug helper (mirrors src/lib/jobSlug.ts) ─────────────────────────
 function toJobSlug(id: number, title: string, company: string): string {
@@ -2269,7 +2269,7 @@ if (existsSync(STATIC_DIR)) {
     }));
   });
 
-  app.use("/*", serveStatic({ root: "./out" }));
+  app.use("/*", serveStatic({ root: "./dist" }));
   app.notFound((c) => {
     // SPA fallback — let React Router handle the route
     try {

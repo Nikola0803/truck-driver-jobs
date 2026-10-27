@@ -2241,7 +2241,7 @@ if (existsSync(STATIC_DIR)) {
           "@type": "Organization",
           "name": "TruckDriverJobs.co",
           "url": DOMAIN,
-          "logo": { "@type": "ImageObject", "url": `${DOMAIN}/vite.svg` },
+          "logo": { "@type": "ImageObject", "url": `${DOMAIN}/logo.png`, "width": 200, "height": 60 },
         },
         "mainEntityOfPage": { "@type": "WebPage", "@id": canonical },
       },
@@ -2266,6 +2266,182 @@ if (existsSync(STATIC_DIR)) {
       jsonLd,
       ogImage: post.image_url ?? undefined,
       bodyContent: blogBodyContent,
+    }));
+  });
+
+  // ── Server-side SEO: home page (/), /jobs listing, /blog listing ──────────
+  // These pages are otherwise served as a bare SPA shell — Googlebot sees no
+  // title, description, or structured data until JavaScript executes.
+
+  app.get("/", (c) => {
+    let html: string;
+    try { html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8"); } catch { return c.text("App not built.", 503); }
+    const DOMAIN = "https://truckdriverjobs.co";
+    const activeRow = db.prepare("SELECT COUNT(*) as c FROM jobs WHERE status='active'").get() as any;
+    const activeCount = activeRow?.c ?? 0;
+    const featuredJobs = db.prepare(
+      "SELECT id, title, company, location, pay_rate FROM jobs WHERE status='active' ORDER BY created_at DESC LIMIT 6"
+    ).all() as any[];
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const jobItems = featuredJobs.map((j: any, i: number) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "url": `${DOMAIN}/jobs/${toJobSlug(j.id, j.title ?? "", j.company ?? "")}`,
+      "name": `${j.title} at ${j.company}`,
+    }));
+    const jsonLd: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "TruckDriverJobs.co",
+        "url": DOMAIN,
+        "potentialAction": { "@type": "SearchAction", "target": `${DOMAIN}/jobs?q={search_term_string}`, "query-input": "required name=search_term_string" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "TruckDriverJobs.co",
+        "url": DOMAIN,
+        "logo": { "@type": "ImageObject", "url": `${DOMAIN}/logo.png`, "width": 200, "height": 60 },
+        "sameAs": ["https://www.facebook.com/truckdriverjobs", "https://www.instagram.com/truckdriverjobs"],
+        "areaServed": "US",
+        "contactPoint": { "@type": "ContactPoint", "contactType": "customer support", "availableLanguage": "English" },
+      },
+      ...(jobItems.length ? [{
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Latest CDL Truck Driving Jobs",
+        "numberOfItems": activeCount,
+        "itemListElement": jobItems,
+      }] : []),
+    ];
+    const jobListHtml = featuredJobs.map((j: any) => {
+      const slug = toJobSlug(j.id, j.title ?? "", j.company ?? "");
+      return `<li><a href="${DOMAIN}/jobs/${slug}">${escHtml(j.title)} at ${escHtml(j.company)} — ${escHtml(j.location)}${j.pay_rate ? " · " + escHtml(j.pay_rate) : ""}</a></li>`;
+    }).join("\n");
+    const bodyContent = `
+      <article>
+        <h1>CDL Truck Driving Jobs Across America</h1>
+        <p>Find ${activeCount} verified CDL Class A truck driving jobs across all 48 states. Dry Van, Flatbed, Reefer, Tanker, OTR, Regional, Local and Dedicated routes. Apply in 30 seconds — no resume needed.</p>
+        ${featuredJobs.length ? `<h2>Latest CDL Jobs</h2><ul>${jobListHtml}</ul>` : ""}
+        <p><a href="${DOMAIN}/jobs">Browse all ${activeCount} CDL truck driving jobs</a></p>
+      </article>`;
+    return c.html(injectSeoIntoHtml(html, {
+      title: `${activeCount > 0 ? activeCount + " " : ""}CDL Trucking Jobs Across America | TruckDriverJobs.co`,
+      description: `Find ${activeCount} verified CDL Class A truck driving jobs across all 48 states. No resume needed — apply in 30 seconds. OTR, Regional, Local and Dedicated routes available.`,
+      canonical: `${DOMAIN}/`,
+      jsonLd,
+      bodyContent,
+    }));
+  });
+
+  app.get("/jobs", (c) => {
+    let html: string;
+    try { html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8"); } catch { return c.text("App not built.", 503); }
+    const DOMAIN = "https://truckdriverjobs.co";
+    const activeRow = db.prepare("SELECT COUNT(*) as c FROM jobs WHERE status='active'").get() as any;
+    const activeCount = activeRow?.c ?? 0;
+    const recentJobs = db.prepare(
+      "SELECT id, title, company, location, pay_rate, equipment, route_type FROM jobs WHERE status='active' ORDER BY created_at DESC LIMIT 10"
+    ).all() as any[];
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const jobItems = recentJobs.map((j: any, i: number) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "url": `${DOMAIN}/jobs/${toJobSlug(j.id, j.title ?? "", j.company ?? "")}`,
+      "name": `${j.title} at ${j.company} — ${j.location}`,
+    }));
+    const jsonLd: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": DOMAIN },
+          { "@type": "ListItem", "position": 2, "name": "CDL Jobs", "item": `${DOMAIN}/jobs` },
+        ],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "CDL Truck Driving Jobs",
+        "description": `Browse ${activeCount} verified CDL truck driving jobs across all 48 states.`,
+        "url": `${DOMAIN}/jobs`,
+        "numberOfItems": activeCount,
+        "itemListElement": jobItems,
+      },
+    ];
+    const jobListHtml = recentJobs.map((j: any) => {
+      const slug = toJobSlug(j.id, j.title ?? "", j.company ?? "");
+      return `<li><a href="${DOMAIN}/jobs/${slug}">${escHtml(j.title)} at ${escHtml(j.company)} — ${escHtml(j.location)}${j.pay_rate ? " · " + escHtml(j.pay_rate) : ""}</a></li>`;
+    }).join("\n");
+    const bodyContent = `
+      <article>
+        <h1>CDL Truck Driving Jobs — ${activeCount} Open Positions</h1>
+        <p>Browse ${activeCount} verified CDL Class A truck driving jobs across all 48 states. Dry Van, Flatbed, Reefer, Tanker, OTR, Regional, Local and Dedicated routes available. Apply in 30 seconds — no resume needed.</p>
+        ${recentJobs.length ? `<h2>Recent Openings</h2><ul>${jobListHtml}</ul>` : ""}
+      </article>`;
+    return c.html(injectSeoIntoHtml(html, {
+      title: `${activeCount > 0 ? activeCount + " " : ""}CDL Truck Driving Jobs | TruckDriverJobs.co`,
+      description: `Browse ${activeCount} verified CDL Class A truck driving jobs. OTR, Regional, Local routes. Dry Van, Flatbed, Reefer, Tanker. No resume needed — apply in 30 seconds.`,
+      canonical: `${DOMAIN}/jobs`,
+      jsonLd,
+      bodyContent,
+    }));
+  });
+
+  app.get("/blog", (c) => {
+    let html: string;
+    try { html = readFileSync(resolve(STATIC_DIR, "index.html"), "utf-8"); } catch { return c.text("App not built.", 503); }
+    const DOMAIN = "https://truckdriverjobs.co";
+    const posts = db.prepare(
+      "SELECT slug, title, excerpt, published_at FROM blog_posts WHERE status='published' ORDER BY published_at DESC LIMIT 10"
+    ).all() as any[];
+    const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const postItems = posts.map((p: any, i: number) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "url": `${DOMAIN}/blog/${p.slug}`,
+      "name": p.title,
+    }));
+    const jsonLd: Record<string, unknown>[] = [
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": DOMAIN },
+          { "@type": "ListItem", "position": 2, "name": "The Dispatch", "item": `${DOMAIN}/blog` },
+        ],
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        "name": "The Dispatch — CDL Trucking News & Advice",
+        "description": "Trucking industry news, CDL tips, pay guides, and career advice for professional truck drivers.",
+        "url": `${DOMAIN}/blog`,
+        "publisher": {
+          "@type": "Organization",
+          "name": "TruckDriverJobs.co",
+          "url": DOMAIN,
+          "logo": { "@type": "ImageObject", "url": `${DOMAIN}/logo.png`, "width": 200, "height": 60 },
+        },
+        ...(postItems.length ? { "blogPost": postItems } : {}),
+      },
+    ];
+    const postListHtml = posts.map((p: any) =>
+      `<li><a href="${DOMAIN}/blog/${p.slug}">${escHtml(p.title)}</a>${p.excerpt ? ` — ${escHtml(p.excerpt)}` : ""}</li>`
+    ).join("\n");
+    const bodyContent = `
+      <article>
+        <h1>The Dispatch — CDL Trucking News &amp; Advice</h1>
+        <p>Trucking industry news, CDL tips, pay guides, and career advice for professional truck drivers.</p>
+        ${posts.length ? `<h2>Latest Articles</h2><ul>${postListHtml}</ul>` : ""}
+      </article>`;
+    return c.html(injectSeoIntoHtml(html, {
+      title: "The Dispatch — CDL Trucking News & Advice | TruckDriverJobs.co",
+      description: "Trucking industry news, CDL tips, pay guides, and career advice for professional truck drivers. Stay informed with The Dispatch.",
+      canonical: `${DOMAIN}/blog`,
+      jsonLd,
+      bodyContent,
     }));
   });
 

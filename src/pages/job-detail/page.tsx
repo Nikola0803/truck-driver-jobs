@@ -190,15 +190,18 @@ export default function JobDetail() {
                 "addressCountry": "US"
               }
             },
-            "baseSalary": {
-              "@type": "MonetaryAmount",
-              "currency": "USD",
-              "value": {
-                "@type": "QuantitativeValue",
-                "value": "competitive",
-                "unitText": "YEAR"
+            ...(job.payRate ? {
+              "baseSalary": {
+                "@type": "MonetaryAmount",
+                "currency": "USD",
+                "value": {
+                  "@type": "QuantitativeValue",
+                  "value": job.payRate,
+                  "unitText": job.payPeriod?.toLowerCase().includes("hour") ? "HOUR" :
+                              job.payPeriod?.toLowerCase().includes("mile") ? "MILE" : "YEAR"
+                }
               }
-            },
+            } : {}),
             "occupationalCategory": job.equipment,
             "qualifications": job.requirements.join(", "),
             "jobBenefits": job.benefits.join(", "),

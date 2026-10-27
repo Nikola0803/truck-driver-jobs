@@ -3,6 +3,7 @@ User-agent: *
 Allow: /
 Allow: /jobs
 Allow: /jobs/
+Allow: /cdl-jobs/
 Allow: /blog
 Allow: /blog/
 Allow: /for-fleets

@@ -213,7 +213,7 @@ export default function BlogPost() {
         "@type": "Organization",
         "name": "TruckDriverJobs.co",
         "url": SITE_URL,
-        "logo": { "@type": "ImageObject", "url": `${SITE_URL}/vite.svg` }
+        "logo": { "@type": "ImageObject", "url": `${SITE_URL}/logo.png`, "width": 200, "height": 60 }
       },
       "mainEntityOfPage": {
         "@type": "WebPage",
